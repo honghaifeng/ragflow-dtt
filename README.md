@@ -1,105 +1,151 @@
 <div align="center">
-  <img src="docs/images/ragflow-plus.png" width="400" alt="Ragflow-Plus">
+  <img src="web/public/logo-dtt.png" width="300" alt="Ragflow-DTT">
+  <h1>Ragflow-DTT</h1>
+  <p>基于 Ragflow-Plus 的电力行业知识图谱引擎</p>
 </div>
 
 <div align="center">
-  <a href="https://github.com/zstar1003/ragflow-plus/stargazers"><img src="https://img.shields.io/github/stars/zstar1003/ragflow-plus?style=social" alt="stars"></a>
-  <img src="https://img.shields.io/badge/版本-0.5.0-blue" alt="版本">
+  <img src="https://img.shields.io/badge/版本-0.5.0--dtt-blue" alt="版本">
   <a href="LICENSE"><img src="https://img.shields.io/badge/许可证-AGPL3.0-green" alt="许可证"></a>
-  <a href="https://hub.docker.com/r/zstar1003/ragflowplus/tags"><img src="https://img.shields.io/docker/pulls/zstar1003/ragflowplus" alt="docker pulls"></a>
-
-  <h4>
-    <a href="README.md">🇨🇳 中文</a>
-    <span> | </span>
-    <a href="README_EN.md">🇬🇧 English</a>
-  </h4>
 </div>
 
 ---
 
-## 🌟 简介
+## 简介
 
-Ragflow-Plus 是一个基于 Ragflow 的二次开发项目，目的是解决实际应用中的一些问题，主要有以下特点：
+Ragflow-DTT 是面向电力行业的知识图谱与智能问答平台，基于 [Ragflow-Plus](https://github.com/zstar1003/ragflow-plus) v0.5.0 二次开发，针对电力行业场景进行了深度定制。
 
-- 管理模式  
-额外搭建后台管理系统，支持管理员执行用户管理、团队管理、配置管理、文件管理、知识库管理等功能
-- 权限回收  
-前台系统对用户权限进行收缩，进一步简化界面
-- 解析增强  
-使用MinerU替代DeepDoc算法，使文件解析效果更好，并支持图片解析
-- 图文输出  
-支持模型在回答时，输出引用文本块关联的相关图片
-- 文档撰写模式  
-支持全新的文档模式交互体验
+### 核心能力
 
-一句话总结：RagflowPlus 是 Ragflow 在中文应用场景下的“行业特解”。
+- **GraphRAG 知识图谱** - 实体/关系提取、Leiden 社区检测、PageRank 排序、图谱可视化
+- **文档智能解析** - 基于 MinerU 的 PDF/Word/Excel/PPT/图片 OCR 解析，支持版面分析
+- **RAG 智能问答** - 混合检索（BM25 + 向量）、重排序、LLM 流式生成、引用标注
+- **管理后台** - 用户/团队/知识库/对话/文档全生命周期管理
+- **多模型适配** - OpenAI/DeepSeek/Qwen/Ollama/BAAI-BGE 等
 
-## 📥使用方式
+### DTT 定制增强
 
-视频演示及操作教程：
+| 功能 | 说明 |
+|------|------|
+| 图谱可视化增强 | 全屏浏览器、实体详情面板、关系过滤、社区聚类高亮 |
+| MinerU 解析器配置 | OCR 开关、分块参数、表格策略、公式识别、自定义分割规则 |
+| 问答评测体系 | 评测数据集管理、BLEU/ROUGE-L/关键词覆盖率评分、准确率报表 |
+| 品牌定制 | 大唐集团 Logo/Favicon、项目名 Ragflow-DTT |
 
-[![Ragflow-Plus项目简介与操作指南](https://i0.hdslb.com/bfs/archive/f7d8da4a112431af523bfb64043fe81da7dad8ee.jpg@672w_378h_1c.avif)](https://www.bilibili.com/video/BV1UJLezaEEE)
+---
 
-项目文档：[xdxsb.top/ragflow-plus](https://xdxsb.top/ragflow-plus)
+## 技术架构
 
-使用 Docker 快速启动：
-```bash
-docker compose -f docker/docker-compose.yml up -d
+```
+┌─────────────────────────────────────────────────┐
+│                   Nginx (80/443)                │
+├───────────────┬────────────────┬────────────────┤
+│ React前端     │ Vue3管理后台   │ SDK/OpenAI兼容 │
+│ UmiJS + Antd  │ Element Plus   │  RESTful API   │
+├───────────────┴────────────────┴────────────────┤
+│              Flask API Server (9380)            │
+│  知识库│文档│对话│Agent│GraphRAG│评测            │
+├───────────┬──────────┬──────────┬───────────────┤
+│ MySQL 8.0 │ ES 8.11  │ MinIO   │ Redis/Valkey  │
+│ 元数据ORM │ 向量+全文│ 文件存储│ 缓存+任务队列 │
+├───────────┴──────────┴──────────┴───────────────┤
+│           Task Executor (后台进程)              │
+│  文档解析(MinerU)→分块→嵌入→GraphRAG→写入ES    │
+├─────────────────────────────────────────────────┤
+│          LLM Factory (多模型适配)               │
+│  OpenAI/DeepSeek/Qwen/Ollama/BAAI-BGE          │
+└─────────────────────────────────────────────────┘
 ```
 
-## ❓ 问题解答
+## 技术栈
 
-- 如果在使用过程中遇到问题，可以先查看[常见问题](docs/question/README.md)或仓库issue是否有解答。
-- 如果未能解决您的问题，也可以使用[DeepWiki](https://deepwiki.com/zstar1003/ragflow-plus)或[zread](https://zread.ai/zstar1003/ragflow-plus)与AI助手交流，这可以解决大部分常见问题。
-- 如果仍然无法解决问题，可以提交仓库issue，会有AI助手自动进行问题解答。
+| 层级 | 技术选型 |
+|------|---------|
+| 前端(用户端) | React 18 + UmiJS 4 + Ant Design 5 + TailwindCSS |
+| 前端(管理端) | Vue 3 + Vite + Element Plus + Pinia |
+| 后端API | Python Flask + Peewee ORM + JWT |
+| 文档解析 | MinerU (magic-pdf) + OCR/布局分析 |
+| 向量搜索 | Elasticsearch 8.11 混合搜索 |
+| 知识图谱 | GraphRAG (实体/关系提取 + Leiden + PageRank) |
+| 嵌入模型 | BAAI/bge-large-zh-v1.5 (默认) |
+| 存储 | MySQL 8.0 + Elasticsearch + MinIO + Redis |
+| 部署 | Docker Compose |
 
-## 🛠️ 如何贡献
+---
 
-1. Fork本GitHub仓库
-2. 将fork克隆到本地：  
-`git clone git@github.com:<你的用户名>/ragflow-plus.git`
-3. 创建本地分支：  
-`git checkout -b my-branch`
-4. 提交信息需包含充分说明：  
-`git commit -m '提交信息需包含充分说明'`
-5. 推送更改到GitHub（含必要提交信息）：  
-`git push origin my-branch`
-6. 提交PR等待审核
+## 快速部署
 
+### 环境要求
 
-## 🚀 鸣谢
+- Linux (Ubuntu 20.04+)
+- Docker 20.10+
+- Docker Compose v2
+- 8+ vCPU / 16+ GB RAM / 100+ GB 磁盘
 
-本项目基于以下开源项目开发：
+### 部署步骤
 
-- [ragflow](https://github.com/infiniflow/ragflow)
+```bash
+# 1. 克隆仓库
+git clone https://github.com/honghaifeng/ragflow-dtt.git
+cd ragflow-dtt/docker
 
-- [v3-admin-vite](https://github.com/un-pany/v3-admin-vite)
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env 设置密码和配置
 
-- [minerU](https://github.com/opendatalab/MinerU)
+# 3. 启动核心服务
+docker compose --profile cpu --profile elasticsearch up -d
 
-感谢此项目贡献者们：
+# 4. 启动管理后台
+cd ../management
+docker compose up -d
 
-<a href="https://github.com/zstar1003/ragflow-plus/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=zstar1003/ragflow-plus" />
-</a>
+# 5. 访问服务
+# 前端: http://your-ip:80
+# 管理后台: http://your-ip:8888
+# API: http://your-ip:9380
+```
 
+### 默认端口
 
-## 📜  许可证与使用限制
-1. **本仓库基于AGPLv3许可证**  
-   由于包含第三方AGPLv3代码，本项目必须遵循AGPLv3的全部条款。这意味着：
-   - 任何**衍生作品**（包括修改或组合代码）必须继续使用AGPLv3并公开源代码。  
-   - 若通过**网络服务**提供本软件，用户有权获取对应源码。
+| 服务 | 端口 |
+|------|------|
+| Nginx (前端) | 80 |
+| API Server | 9380 |
+| 管理后台 | 8888 |
+| MySQL | 5455 |
+| Elasticsearch | 1200 |
+| MinIO Console | 9001 |
 
-2. **商用说明**  
-   - **允许商用**：本软件遵循AGPLv3，允许商业使用，包括SaaS和企业内部部署。
-   - **不修改代码**：若仅原样运行（不修改、不衍生），仍需遵守AGPLv3，包括：  
-     - 提供完整的源代码（即使未修改）。  
-     - 若作为网络服务提供，需允许用户下载对应源码（AGPLv3第13条）。
-   - **不允许闭源商用**：如需闭源（不公开修改后的代码）商用，需获得所有代码版权持有人的书面授权（包括上游AGPLv3代码作者）  
+---
 
-3. **免责声明**  
-   本项目不提供任何担保，使用者需自行承担合规风险。若需法律建议，请咨询专业律师。
-   
-## ✨ Star History
+## 项目结构
 
-![Stargazers over time](https://starchart.cc/zstar1003/ragflow-plus.svg)
+```
+ragflow-dtt/
+├── api/                    # Flask 后端 API
+│   ├── apps/              # 路由模块
+│   │   ├── kb_app.py      # 知识库
+│   │   ├── dialog_app.py  # 对话
+│   │   ├── evaluation_app.py  # 问答评测 (DTT新增)
+│   │   └── ...
+│   └── db/                # 数据库模型
+├── web/                   # React 前端
+│   ├── src/pages/
+│   │   ├── add-knowledge/ # 知识库详情
+│   │   │   └── components/knowledge-graph/  # 图谱可视化 (DTT增强)
+│   │   ├── evaluation/    # 问答评测页面 (DTT新增)
+│   │   └── ...
+│   └── public/            # 静态资源 (Logo/Favicon)
+├── management/            # Vue3 管理后台
+├── graphrag/              # GraphRAG 模块
+├── deepdoc/               # 文档解析
+├── docker/                # Docker 部署配置
+└── rag/                   # RAG 核心模块
+```
+
+---
+
+## 许可证
+
+本项目基于 [AGPLv3](LICENSE) 许可证开源，继承自 Ragflow-Plus / RAGFlow。
