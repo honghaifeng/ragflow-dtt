@@ -35,6 +35,25 @@ class TenantPermission(StrEnum):
     TEAM = 'team'
 
 
+class OrgRole(StrEnum):
+    OWNER = 'owner'
+    ADMIN = 'admin'
+    EDITOR = 'editor'
+    VIEWER = 'viewer'
+
+
+class KbPermissionLevel(StrEnum):
+    VIEW = 'view'
+    EDIT = 'edit'
+    MANAGE = 'manage'
+
+
+class KbPermissionType(StrEnum):
+    PRIVATE = 'private'
+    ORG = 'org'
+    CUSTOM = 'custom'
+
+
 class SerializedType(IntEnum):
     PICKLE = 1
     JSON = 2

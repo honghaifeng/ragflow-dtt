@@ -40,8 +40,10 @@ const { isLeft, isTop } = useLayoutMode()
     display: none;
   }
   .layout-logo-text {
-    height: 100%;
+    max-height: 80%;
+    max-width: 80%;
     vertical-align: middle;
+    object-fit: contain;
   }
 }
 
@@ -52,10 +54,11 @@ const { isLeft, isTop } = useLayoutMode()
 
 .collapse {
   .layout-logo {
-    width: 32px;
-    height: 32px;
+    max-width: 80%;
+    max-height: 32px;
     vertical-align: middle;
     display: inline-block;
+    object-fit: contain;
   }
   .layout-logo-text {
     display: none;

@@ -2,9 +2,11 @@
 import { useAppStore } from "@/pinia/stores/app"
 import { usePermissionStore } from "@/pinia/stores/permission"
 import { useSettingsStore } from "@/pinia/stores/settings"
+import { useUserStore } from "@/pinia/stores/user"
 import { useDevice } from "@@/composables/useDevice"
 import { useLayoutMode } from "@@/composables/useLayoutMode"
 import { getCssVar } from "@@/utils/css"
+import { Expand, Fold, SwitchButton } from "@element-plus/icons-vue"
 import { Logo } from "../index"
 import Item from "./Item.vue"
 
@@ -15,9 +17,11 @@ const v3SidebarMenuActiveTextColor = getCssVar("--v3-sidebar-menu-active-text-co
 const { isMobile } = useDevice()
 const { isLeft, isTop } = useLayoutMode()
 const route = useRoute()
+const router = useRouter()
 const appStore = useAppStore()
 const permissionStore = usePermissionStore()
 const settingsStore = useSettingsStore()
+const userStore = useUserStore()
 
 const activeMenu = computed(() => route.meta.activeMenu || route.path)
 const noHiddenRoutes = computed(() => permissionStore.routes.filter(item => !item.meta?.hidden))
@@ -29,12 +33,21 @@ const activeTextColor = computed(() => (isLeft.value ? v3SidebarMenuActiveTextCo
 const sidebarMenuItemHeight = computed(() => !isTop.value ? "var(--v3-sidebar-menu-item-height)" : "var(--v3-navigationbar-height)")
 const sidebarMenuHoverBgColor = computed(() => !isTop.value ? "var(--v3-sidebar-menu-hover-bg-color)" : "transparent")
 const tipLineWidth = computed(() => !isTop.value ? "2px" : "0px")
+
+function toggleSidebar() {
+  appStore.toggleSidebar(false)
+}
+
+function logout() {
+  userStore.logout()
+  router.push("/login")
+}
 </script>
 
 <template>
-  <div :class="{ 'has-logo': isLogo }">
+  <div class="sidebar-layout" :class="{ 'has-logo': isLogo }">
     <Logo v-if="isLogo" :collapse="isCollapse" />
-    <el-scrollbar wrap-class="scrollbar-wrapper">
+    <el-scrollbar wrap-class="scrollbar-wrapper" class="menu-scrollbar">
       <el-menu
         :default-active="activeMenu"
         :collapse="isCollapse && !isTop"
@@ -52,6 +65,33 @@ const tipLineWidth = computed(() => !isTop.value ? "2px" : "0px")
         />
       </el-menu>
     </el-scrollbar>
+    <!-- 底部：用户名 + 退出 + 折叠 -->
+    <div v-if="isLeft" class="sidebar-footer">
+      <div v-if="!isCollapse" class="footer-expanded">
+        <el-dropdown>
+          <span class="user-info">
+            <el-avatar :src="userStore.avatar" :size="28" />
+            <span class="user-name">{{ userStore.username }}</span>
+          </span>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="logout">
+                <el-icon><SwitchButton /></el-icon>
+                退出登录
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <div class="collapse-btn" @click="toggleSidebar">
+          <el-icon :size="18"><Fold /></el-icon>
+        </div>
+      </div>
+      <div v-else class="footer-collapsed">
+        <div class="collapse-btn" @click="toggleSidebar">
+          <el-icon :size="18"><Expand /></el-icon>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -68,22 +108,30 @@ const tipLineWidth = computed(() => !isTop.value ? "2px" : "0px")
   }
 }
 
+.sidebar-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.menu-scrollbar {
+  flex: 1;
+  overflow: hidden;
+}
+
 .has-logo {
-  .el-scrollbar {
-    height: calc(100% - var(--v3-header-height));
+  .menu-scrollbar {
+    height: calc(100% - var(--v3-header-height) - 50px);
   }
 }
 
 .el-scrollbar {
   height: 100%;
   :deep(.scrollbar-wrapper) {
-    // 限制水平宽度
     overflow-x: hidden;
   }
-  // 滚动条
   :deep(.el-scrollbar__bar) {
     &.is-horizontal {
-      // 隐藏水平滚动条
       display: none;
     }
   }
@@ -129,6 +177,60 @@ const tipLineWidth = computed(() => !isTop.value ? "2px" : "0px")
       @extend %tip-line;
       background-color: v-bind(sidebarMenuHoverBgColor);
     }
+  }
+}
+
+// 底部栏
+.sidebar-footer {
+  border-top: 1px solid var(--el-border-color-lighter);
+  background-color: var(--v3-sidebar-menu-bg-color);
+  flex-shrink: 0;
+}
+
+.footer-expanded {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  height: 50px;
+  box-sizing: border-box;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.user-name {
+  font-size: 13px;
+  color: var(--v3-sidebar-menu-text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.footer-collapsed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 50px;
+}
+
+.collapse-btn {
+  cursor: pointer;
+  color: var(--v3-sidebar-menu-text-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  &:hover {
+    background-color: var(--v3-sidebar-menu-hover-bg-color);
   }
 }
 </style>

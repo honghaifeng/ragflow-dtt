@@ -1,7 +1,7 @@
 <div align="center">
   <img src="web/public/logo-dtt.png" width="300" alt="Ragflow-DTT">
   <h1>Ragflow-DTT</h1>
-  <p>基于 Ragflow-Plus 的电力行业知识图谱引擎</p>
+  <p>基于 Ragflow-DTT 的电力行业知识图谱引擎</p>
 </div>
 
 <div align="center">
@@ -148,4 +148,4 @@ ragflow-dtt/
 
 ## 许可证
 
-本项目基于 [AGPLv3](LICENSE) 许可证开源，继承自 Ragflow-Plus / RAGFlow。
+本项目基于 [AGPLv3](LICENSE) 许可证开源，继承自 Ragflow-DTT / RAGFlow。

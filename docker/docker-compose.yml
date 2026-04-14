@@ -55,7 +55,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./ragflow-plus-logs:/app/logs
+      - ./ragflow-dtt-logs:/app/logs
       - ./magic-pdf.json:/root/magic-pdf.json
 
     depends_on:

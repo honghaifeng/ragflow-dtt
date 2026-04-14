@@ -8,6 +8,7 @@ tenants_bp = Blueprint('tenants', __name__, url_prefix='/api/v1/tenants')
 files_bp = Blueprint('files', __name__, url_prefix='/api/v1/files')
 knowledgebase_bp = Blueprint('knowledgebases', __name__, url_prefix='/api/v1/knowledgebases')
 conversation_bp = Blueprint('conversation', __name__, url_prefix='/api/v1/conversation')
+stats_bp = Blueprint('stats', __name__, url_prefix='/api/v1/stats')
 
 # 导入路由
 from .users.routes import *
@@ -16,6 +17,7 @@ from .tenants.routes import *
 from .files.routes import *
 from .knowledgebases.routes import *
 from .conversation.routes import *
+from .stats.routes import *
 
 
 def register_routes(app):
@@ -26,3 +28,4 @@ def register_routes(app):
     app.register_blueprint(files_bp)
     app.register_blueprint(knowledgebase_bp)
     app.register_blueprint(conversation_bp)
+    app.register_blueprint(stats_bp)

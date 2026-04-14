@@ -6,7 +6,6 @@ import { useUserStore } from "@/pinia/stores/user"
 import ThemeSwitch from "@@/components/ThemeSwitch/index.vue"
 import { Key, Loading, Lock, Picture, User } from "@element-plus/icons-vue"
 import { loginApi } from "./apis"
-import Owl from "./components/Owl.vue"
 import { useFocus } from "./composables/useFocus"
 
 const router = useRouter()
@@ -82,7 +81,6 @@ function handleLogin() {
 <template>
   <div class="login-container">
     <ThemeSwitch v-if="settingsStore.showThemeSwitch" class="theme-switch" />
-    <Owl :close-eyes="isFocus" />
     <div class="login-card">
       <div class="title">
         <img src="@@/assets/images/layouts/logo-text-2.png">

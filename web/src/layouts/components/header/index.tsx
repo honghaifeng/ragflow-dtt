@@ -3,7 +3,7 @@ import { ReactComponent as WriteIcon } from '@/assets/svg/write.svg';
 import { useTranslate } from '@/hooks/common-hooks';
 import { useFetchAppConf } from '@/hooks/logic-hooks';
 import { useNavigateWithFromState } from '@/hooks/route-hook';
-import { MessageOutlined, SearchOutlined, ExperimentOutlined } from '@ant-design/icons';
+import { MessageOutlined, SearchOutlined, ExperimentOutlined, TeamOutlined } from '@ant-design/icons';
 import { Flex, Layout, Radio, Space, theme } from 'antd';
 import { MouseEventHandler, useCallback, useMemo } from 'react';
 import { useLocation } from 'umi';
@@ -30,6 +30,7 @@ const RagHeader = () => {
       { path: '/write', name: t('write'), icon: WriteIcon },
       { path: '/search', name: t('search'), icon: SearchOutlined },
       { path: '/evaluation', name: t('evaluation'), icon: ExperimentOutlined },
+      { path: '/organization', name: t('organization'), icon: TeamOutlined },
     ],
     [t],
   );

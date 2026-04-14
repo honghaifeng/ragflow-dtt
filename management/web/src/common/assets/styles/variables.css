@@ -21,10 +21,10 @@
   --v3-sidebar-border-right: 1px solid var(--el-fill-color);
   --v3-sidebar-menu-item-height: 60px;
   --v3-sidebar-menu-tip-line-bg-color: var(--el-color-primary);
-  --v3-sidebar-menu-bg-color: #001428;
-  --v3-sidebar-menu-hover-bg-color: #409eff10;
-  --v3-sidebar-menu-text-color: #cfd3dc;
-  --v3-sidebar-menu-active-text-color: #ffffff;
+  --v3-sidebar-menu-bg-color: #ffffff;
+  --v3-sidebar-menu-hover-bg-color: #f0f7ff;
+  --v3-sidebar-menu-text-color: #606266;
+  --v3-sidebar-menu-active-text-color: var(--el-color-primary);
   /* TagsView 组件 */
   --v3-tagsview-height: 34px;
   --v3-tagsview-text-color: var(--el-text-color-regular);
@@ -44,7 +44,7 @@
   /* Hamburger 组件 */
   --v3-hamburger-text-color: var(--el-text-color-primary);
   /* RightPanel 组件  */
-  --v3-rightpanel-button-bg-color: #001428;
+  --v3-rightpanel-button-bg-color: var(--el-color-primary);
 }
 
 /* 内容区放大时，将不需要的组件隐藏 */

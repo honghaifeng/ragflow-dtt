@@ -3,7 +3,7 @@ import { useAppStore } from "@/pinia/stores/app"
 import { useSettingsStore } from "@/pinia/stores/settings"
 import { useDevice } from "@@/composables/useDevice"
 import { useLayoutMode } from "@@/composables/useLayoutMode"
-import { AppMain, NavigationBar, Sidebar, TagsView } from "../components"
+import { AppMain, Sidebar, TagsView } from "../components"
 
 const { isMobile } = useDevice()
 const { isLeft } = useLayoutMode()
@@ -36,10 +36,9 @@ function handleClickOutside() {
     <Sidebar class="sidebar-container" />
     <!-- 主容器 -->
     <div :class="{ hasTagsView: showTagsView }" class="main-container">
-      <!-- 头部导航栏和标签栏 -->
-      <div :class="{ 'fixed-header': fixedHeader }" class="layout-header">
-        <NavigationBar />
-        <TagsView v-show="showTagsView" />
+      <!-- 标签栏 -->
+      <div v-if="showTagsView" :class="{ 'fixed-header': fixedHeader }" class="layout-header">
+        <TagsView />
       </div>
       <!-- 页面主体内容 -->
       <AppMain class="app-main" />
@@ -105,15 +104,9 @@ $transition-time: 0.35s;
 }
 
 .app-main {
-  min-height: calc(100vh - var(--v3-navigationbar-height));
+  min-height: 100vh;
   position: relative;
   overflow: hidden;
-}
-
-.fixed-header + .app-main {
-  padding-top: var(--v3-navigationbar-height);
-  height: 100vh;
-  overflow: auto;
 }
 
 .hasTagsView {

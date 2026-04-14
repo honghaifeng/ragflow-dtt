@@ -290,6 +290,12 @@ watch([() => paginationData.currentPage, () => paginationData.pageSize], getTabl
           <el-table-column type="selection" width="50" align="center" />
           <el-table-column prop="username" label="用户名" align="center" sortable="custom" />
           <el-table-column prop="email" label="邮箱" align="center" sortable="custom" />
+          <el-table-column prop="orgNames" label="所属组织" align="center" show-overflow-tooltip>
+            <template #default="scope">
+              <span v-if="scope.row.orgNames">{{ scope.row.orgNames }}</span>
+              <el-tag v-else type="info" size="small">无</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column prop="createTime" label="创建时间" align="center" sortable="custom" />
           <el-table-column prop="updateTime" label="更新时间" align="center" sortable="custom" />
           <el-table-column fixed="right" label="操作" width="300" align="center">

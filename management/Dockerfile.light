@@ -1,0 +1,7 @@
+FROM python:3.10-slim AS backend
+WORKDIR /app
+COPY server/requirements-light.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+COPY server /app
+EXPOSE 5000
+CMD ["python", "app.py"]

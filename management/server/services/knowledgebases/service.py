@@ -9,8 +9,12 @@ import requests
 from database import DB_CONFIG, get_es_client
 from utils import generate_uuid
 
-# 解析相关模块
-from .document_parser import _update_document_progress, perform_parse
+# 解析相关模块（延迟加载，避免无 magic_pdf 时启动失败）
+try:
+    from .document_parser import _update_document_progress, perform_parse
+except ImportError:
+    _update_document_progress = None
+    perform_parse = None
 
 # 用于存储进行中的顺序批量任务状态
 # 结构: { kb_id: {"status": "running/completed/failed", "total": N, "current": M, "message": "...", "start_time": timestamp} }
@@ -265,6 +269,9 @@ class KnowledgebaseService:
             update_date = create_date
             update_time = create_time
 
+            # org_id（从管理端创建时传入）
+            org_id = data.get("org_id")
+
             # 完整的字段列表
             query = """
                 INSERT INTO knowledgebase (
@@ -272,13 +279,13 @@ class KnowledgebaseService:
                     avatar, tenant_id, name, language, description,
                     embd_id, permission, created_by, doc_num, token_num,
                     chunk_num, similarity_threshold, vector_similarity_weight, parser_id, parser_config,
-                    pagerank, status
+                    pagerank, status, org_id
                 ) VALUES (
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s, %s,
-                    %s, %s
+                    %s, %s, %s
                 )
             """
 
@@ -322,6 +329,7 @@ class KnowledgebaseService:
                     default_parser_config,  # parser_config
                     0,  # pagerank
                     "1",  # status
+                    org_id,  # org_id
                 ),
             )
             conn.commit()

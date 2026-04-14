@@ -558,6 +558,10 @@ class InvitationCode(DataBaseModel):
     visit_time = DateTimeField(null=True, index=True)
     user_id = CharField(max_length=32, null=True, index=True)
     tenant_id = CharField(max_length=32, null=True, index=True)
+    org_id = CharField(max_length=32, null=True, index=True)
+    expire_time = DateTimeField(null=True, index=True)
+    max_uses = IntegerField(default=0)
+    used_count = IntegerField(default=0)
     status = CharField(
         max_length=1,
         null=True,
@@ -685,10 +689,11 @@ class Knowledgebase(DataBaseModel):
     permission = CharField(
         max_length=16,
         null=False,
-        help_text="me|team",
-        default="me",
+        help_text="private|org|custom",
+        default="private",
         index=True)
     created_by = CharField(max_length=32, null=False, index=True)
+    org_id = CharField(max_length=32, null=True, help_text="Organization ID", index=True)
     doc_num = IntegerField(default=0, index=True)
     token_num = IntegerField(default=0, index=True)
     chunk_num = IntegerField(default=0, index=True)
@@ -988,6 +993,53 @@ class CanvasTemplate(DataBaseModel):
         db_table = "canvas_template"
 
 
+class Organization(DataBaseModel):
+    id = CharField(max_length=32, primary_key=True)
+    name = CharField(max_length=128, null=False, help_text="Organization name", index=True)
+    description = TextField(null=True, help_text="Organization description")
+    avatar = TextField(null=True, help_text="avatar base64 string")
+    owner_id = CharField(max_length=32, null=False, help_text="creator user id", index=True)
+    parent_id = CharField(max_length=32, null=True, help_text="parent organization id, NULL=root", index=True)
+    status = CharField(
+        max_length=1,
+        null=True,
+        help_text="is it validate(0: wasted, 1: validate)",
+        default="1",
+        index=True)
+
+    class Meta:
+        db_table = "organization"
+
+
+class OrgMember(DataBaseModel):
+    id = CharField(max_length=32, primary_key=True)
+    org_id = CharField(max_length=32, null=False, index=True)
+    user_id = CharField(max_length=32, null=False, index=True)
+    role = CharField(max_length=32, null=False, help_text="OrgRole: owner/admin/editor/viewer", index=True)
+    invited_by = CharField(max_length=32, null=True, index=True)
+    status = CharField(
+        max_length=1,
+        null=True,
+        help_text="is it validate(0: wasted, 1: validate)",
+        default="1",
+        index=True)
+
+    class Meta:
+        db_table = "org_member"
+
+
+class KbPermission(DataBaseModel):
+    id = CharField(max_length=32, primary_key=True)
+    kb_id = CharField(max_length=32, null=False, index=True)
+    target_type = CharField(max_length=16, null=False, help_text="user/org/public", index=True)
+    target_id = CharField(max_length=32, null=True, index=True)
+    permission = CharField(max_length=16, null=False, help_text="view/edit/manage", index=True)
+    granted_by = CharField(max_length=32, null=True, index=True)
+
+    class Meta:
+        db_table = "kb_permission"
+
+
 def migrate_db():
     with DB.transaction():
         migrator = DatabaseMigrator[settings.DATABASE_TYPE.upper()].value(DB)
@@ -1119,6 +1171,42 @@ def migrate_db():
             migrate(
                 migrator.add_column("task", "task_type",
                                     CharField(max_length=32, null=False, default=""))
+            )
+        except Exception:
+            pass
+        # Organization & permission migrations
+        try:
+            migrate(
+                migrator.add_column("knowledgebase", "org_id",
+                                    CharField(max_length=32, null=True, index=True))
+            )
+        except Exception:
+            pass
+        try:
+            migrate(
+                migrator.add_column("invitation_code", "org_id",
+                                    CharField(max_length=32, null=True, index=True))
+            )
+        except Exception:
+            pass
+        try:
+            migrate(
+                migrator.add_column("invitation_code", "expire_time",
+                                    DateTimeField(null=True, index=True))
+            )
+        except Exception:
+            pass
+        try:
+            migrate(
+                migrator.add_column("invitation_code", "max_uses",
+                                    IntegerField(default=0))
+            )
+        except Exception:
+            pass
+        try:
+            migrate(
+                migrator.add_column("invitation_code", "used_count",
+                                    IntegerField(default=0))
             )
         except Exception:
             pass

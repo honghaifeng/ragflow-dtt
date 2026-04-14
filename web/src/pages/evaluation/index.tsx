@@ -33,34 +33,40 @@ import {
 } from '@ant-design/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { request } from 'umi-request';
+import request from '@/utils/request';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
 
 const api_host = '/v1';
 
+// Helper: unwrap getResponse:true format
+const unwrap = async (p: Promise<any>) => {
+  const res = await p;
+  return res?.data ?? res;
+};
+
 // API functions
 const evalApi = {
-  listDatasets: () => request.get(`${api_host}/evaluation/dataset`),
+  listDatasets: () => unwrap(request.get(`${api_host}/evaluation/dataset`)),
   createDataset: (data: any) =>
-    request.post(`${api_host}/evaluation/dataset`, { data }),
+    unwrap(request.post(`${api_host}/evaluation/dataset`, { data })),
   deleteDataset: (id: string) =>
-    request.delete(`${api_host}/evaluation/dataset/${id}`),
+    unwrap(request.delete(`${api_host}/evaluation/dataset/${id}`)),
   listQA: (dsId: string, page = 1, pageSize = 20) =>
-    request.get(`${api_host}/evaluation/dataset/${dsId}/qa`, {
+    unwrap(request.get(`${api_host}/evaluation/dataset/${dsId}/qa`, {
       params: { page, page_size: pageSize },
-    }),
+    })),
   addQA: (dsId: string, data: any) =>
-    request.post(`${api_host}/evaluation/dataset/${dsId}/qa`, { data }),
+    unwrap(request.post(`${api_host}/evaluation/dataset/${dsId}/qa`, { data })),
   updateQA: (dsId: string, qaId: string, data: any) =>
-    request.put(`${api_host}/evaluation/dataset/${dsId}/qa/${qaId}`, { data }),
+    unwrap(request.put(`${api_host}/evaluation/dataset/${dsId}/qa/${qaId}`, { data })),
   deleteQA: (dsId: string, qaId: string) =>
-    request.delete(`${api_host}/evaluation/dataset/${dsId}/qa/${qaId}`),
+    unwrap(request.delete(`${api_host}/evaluation/dataset/${dsId}/qa/${qaId}`)),
   runEval: (dsId: string) =>
-    request.post(`${api_host}/evaluation/dataset/${dsId}/run`),
+    unwrap(request.post(`${api_host}/evaluation/dataset/${dsId}/run`)),
   getReport: (dsId: string) =>
-    request.get(`${api_host}/evaluation/dataset/${dsId}/report`),
+    unwrap(request.get(`${api_host}/evaluation/dataset/${dsId}/report`)),
 };
 
 const scoreColor = (score: number) => {

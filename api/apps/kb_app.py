@@ -58,6 +58,11 @@ def create():
         if not e:
             return get_data_error_result(message="Tenant not found.")
         req["embd_id"] = t.embd_id
+        # Support org_id and new permission types
+        if "org_id" in req:
+            req["org_id"] = req["org_id"]
+        if "permission" not in req:
+            req["permission"] = "private"
         if not KnowledgebaseService.save(**req):
             return get_data_error_result()
         return get_json_result(data={"kb_id": req["id"]})

@@ -1,6 +1,6 @@
 services:
   management-frontend:
-    container_name: ragflowplus-management-frontend
+    container_name: ragflowdtt-management-frontend
     image: zstar1003/ragflowplus-management-web:v0.5.0
     build:
       context: .
@@ -11,17 +11,15 @@ services:
     depends_on:
       - management-backend
     environment:
-      - API_BASE_URL=/api 
+      - API_BASE_URL=/api
     networks:
-      - management_network
+      - ragflow_net
 
   management-backend:
-    container_name: ragflowplus-management-backend
-    image: zstar1003/ragflowplus-management-server:v0.5.0
+    container_name: ragflowdtt-management-backend
     build:
       context: .
-      dockerfile: Dockerfile
-      target: backend
+      dockerfile: Dockerfile.light
     ports:
       - "5000:5000"
     environment:
@@ -33,8 +31,9 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - management_network
+      - ragflow_net
 
 networks:
-  management_network:
-    driver: bridge
+  ragflow_net:
+    external: true
+    name: docker_ragflow

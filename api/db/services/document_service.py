@@ -220,6 +220,7 @@ class DocumentService(CommonService):
     @classmethod
     @DB.connection_context()
     def accessible(cls, doc_id, user_id):
+        # Legacy tenant-based check
         docs = (
             cls.model.select(cls.model.id)
             .join(Knowledgebase, on=(Knowledgebase.id == cls.model.kb_id))
@@ -227,19 +228,30 @@ class DocumentService(CommonService):
             .where(cls.model.id == doc_id, UserTenant.user_id == user_id)
             .paginate(0, 1)
         )
-        docs = docs.dicts()
-        if not docs:
-            return False
-        return True
+        if list(docs.dicts()):
+            return True
+        # Organization-based check via KB
+        doc = cls.model.select(cls.model.kb_id).where(cls.model.id == doc_id).first()
+        if doc:
+            from api.db.services.kb_permission_service import KbPermissionService
+            if KbPermissionService.user_can_access(doc.kb_id, user_id):
+                return True
+        return False
 
     @classmethod
     @DB.connection_context()
     def accessible4deletion(cls, doc_id, user_id):
+        # Creator can always delete
         docs = cls.model.select(cls.model.id).join(Knowledgebase, on=(Knowledgebase.id == cls.model.kb_id)).where(cls.model.id == doc_id, Knowledgebase.created_by == user_id).paginate(0, 1)
-        docs = docs.dicts()
-        if not docs:
-            return False
-        return True
+        if list(docs.dicts()):
+            return True
+        # Org editor+ can delete
+        doc = cls.model.select(cls.model.kb_id).where(cls.model.id == doc_id).first()
+        if doc:
+            from api.db.services.kb_permission_service import KbPermissionService
+            if KbPermissionService.user_can_edit(doc.kb_id, user_id):
+                return True
+        return False
 
     @classmethod
     @DB.connection_context()

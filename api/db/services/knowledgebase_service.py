@@ -14,7 +14,7 @@
 #  limitations under the License.
 #
 from api.db import StatusEnum, TenantPermission
-from api.db.db_models import Knowledgebase, DB, Tenant, User, UserTenant,Document
+from api.db.db_models import Knowledgebase, DB, Tenant, User, UserTenant, Document, OrgMember, KbPermission
 from api.db.services.common_service import CommonService
 from peewee import fn
 
@@ -91,20 +91,31 @@ class KnowledgebaseService(CommonService):
             User.avatar.alias('tenant_avatar'),
             cls.model.update_time
         ]
+        # Get org IDs user belongs to
+        user_org_ids = [
+            m.org_id for m in OrgMember.select(OrgMember.org_id).where(
+                OrgMember.user_id == user_id,
+                OrgMember.status == StatusEnum.VALID.value,
+            )
+        ]
+        # Build visibility condition: own KBs OR team-shared OR org-visible
+        visibility = (
+            (cls.model.tenant_id == user_id) |
+            (cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission == TenantPermission.TEAM.value))
+        )
+        if user_org_ids:
+            visibility = visibility | (
+                cls.model.org_id.in_(user_org_ids) & (cls.model.permission == "org")
+            )
+
         if keywords:
             kbs = cls.model.select(*fields).join(User, on=(cls.model.tenant_id == User.id)).where(
-                ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
-                                                                TenantPermission.TEAM.value)) | (
-                    cls.model.tenant_id == user_id))
-                & (cls.model.status == StatusEnum.VALID.value),
+                visibility & (cls.model.status == StatusEnum.VALID.value),
                 (fn.LOWER(cls.model.name).contains(keywords.lower()))
             )
         else:
             kbs = cls.model.select(*fields).join(User, on=(cls.model.tenant_id == User.id)).where(
-                ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
-                                                                TenantPermission.TEAM.value)) | (
-                    cls.model.tenant_id == user_id))
-                & (cls.model.status == StatusEnum.VALID.value)
+                visibility & (cls.model.status == StatusEnum.VALID.value)
             )
         if parser_id:
             kbs = kbs.where(cls.model.parser_id == parser_id)
@@ -217,12 +228,21 @@ class KnowledgebaseService(CommonService):
             kbs = kbs.where(cls.model.id == id)
         if name:
             kbs = kbs.where(cls.model.name == name)
-        kbs = kbs.where(
-            ((cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission ==
-                                                            TenantPermission.TEAM.value)) | (
-                     cls.model.tenant_id == user_id))
-            & (cls.model.status == StatusEnum.VALID.value)
+        user_org_ids = [
+            m.org_id for m in OrgMember.select(OrgMember.org_id).where(
+                OrgMember.user_id == user_id,
+                OrgMember.status == StatusEnum.VALID.value,
+            )
+        ]
+        visibility = (
+            (cls.model.tenant_id == user_id) |
+            (cls.model.tenant_id.in_(joined_tenant_ids) & (cls.model.permission == TenantPermission.TEAM.value))
         )
+        if user_org_ids:
+            visibility = visibility | (
+                cls.model.org_id.in_(user_org_ids) & (cls.model.permission == "org")
+            )
+        kbs = kbs.where(visibility & (cls.model.status == StatusEnum.VALID.value))
         if desc:
             kbs = kbs.order_by(cls.model.getter_by(orderby).desc())
         else:
@@ -235,13 +255,17 @@ class KnowledgebaseService(CommonService):
     @classmethod
     @DB.connection_context()
     def accessible(cls, kb_id, user_id):
+        # Legacy tenant-based check
         docs = cls.model.select(
             cls.model.id).join(UserTenant, on=(UserTenant.tenant_id == Knowledgebase.tenant_id)
             ).where(cls.model.id == kb_id, UserTenant.user_id == user_id).paginate(0, 1)
-        docs = docs.dicts()
-        if not docs:
-            return False
-        return True
+        if list(docs.dicts()):
+            return True
+        # Organization-based check
+        from api.db.services.kb_permission_service import KbPermissionService
+        if KbPermissionService.user_can_access(kb_id, user_id):
+            return True
+        return False
 
     @classmethod
     @DB.connection_context()
@@ -262,10 +286,12 @@ class KnowledgebaseService(CommonService):
     @classmethod
     @DB.connection_context()
     def accessible4deletion(cls, kb_id, user_id):
+        # Creator can always delete
         docs = cls.model.select(
             cls.model.id).where(cls.model.id == kb_id, cls.model.created_by == user_id).paginate(0, 1)
-        docs = docs.dicts()
-        if not docs:
-            return False
-        return True
+        if list(docs.dicts()):
+            return True
+        # Org admin/owner can delete
+        from api.db.services.kb_permission_service import KbPermissionService
+        return KbPermissionService.user_can_manage(kb_id, user_id)
 

@@ -226,11 +226,31 @@ def get_users_with_pagination(current_page, page_size, username='', email='', so
         """
         cursor.execute(query, params + [page_size, offset])
         results = cursor.fetchall()
-        
-        # 关闭连接
         cursor.close()
+
+        # 查询每个用户所属的组织
+        user_ids = [u["id"] for u in results]
+        org_map = {}
+        if user_ids:
+            placeholders = ",".join(["%s"] * len(user_ids))
+            org_query = f"""
+            SELECT om.user_id, GROUP_CONCAT(o.name SEPARATOR ', ') as org_names
+            FROM org_member om
+            JOIN organization o ON om.org_id = o.id AND o.status = '1'
+            WHERE om.user_id IN ({placeholders}) AND om.status = '1'
+            GROUP BY om.user_id
+            """
+            try:
+                cursor2 = conn.cursor(dictionary=True)
+                cursor2.execute(org_query, user_ids)
+                for row in cursor2.fetchall():
+                    org_map[row["user_id"]] = row["org_names"]
+                cursor2.close()
+            except Exception:
+                pass
+
         conn.close()
-        
+
         # 格式化结果
         formatted_users = []
         for user in results:
@@ -238,10 +258,11 @@ def get_users_with_pagination(current_page, page_size, username='', email='', so
                 "id": user["id"],
                 "username": user["nickname"],
                 "email": user["email"],
+                "orgNames": org_map.get(user["id"], ""),
                 "createTime": user["create_date"].strftime("%Y-%m-%d %H:%M:%S") if user["create_date"] else "",
                 "updateTime": user["update_date"].strftime("%Y-%m-%d %H:%M:%S") if user["update_date"] else "",
             })
-        
+
         return formatted_users, total
         
     except mysql.connector.Error as err:

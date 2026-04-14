@@ -1,446 +1,852 @@
 <script lang="ts" setup>
 import type { FormInstance } from "element-plus"
-import { addTeamMemberApi, getTableDataApi, getTeamMembersApi, getUsersApi, removeTeamMemberApi } from "@@/apis/teams"
-import { usePagination } from "@@/composables/usePagination"
-import { CirclePlus, Refresh, Search, UserFilled } from "@element-plus/icons-vue"
-import { computed } from "vue" // 导入 computed
+import {
+  addTeamMemberApi,
+  createTeamApi,
+  deleteTeamApi,
+  getOrgTreeApi,
+  getOrgKnowledgebasesApi,
+  getOrgFilesApi,
+  getTeamMembersApi,
+  getUsersApi,
+  removeTeamMemberApi,
+  updateMemberRoleApi,
+  updateTeamApi
+} from "@@/apis/teams"
+import { createKnowledgeBaseApi } from "@@/apis/kbs/knowledgebase"
+import { uploadFileApiV2 } from "@@/apis/files/upload"
+import { addDocumentToKnowledgeBaseApi } from "@@/apis/kbs/knowledgebase"
+import { CirclePlus, Delete, Refresh, Search, ArrowLeft, Edit, MoreFilled, Upload } from "@element-plus/icons-vue"
 
 defineOptions({
   name: "TeamManagement"
 })
 
-const loading = ref<boolean>(false)
-const { paginationData, handleCurrentChange, handleSizeChange } = usePagination()
+const ROLE_MAP: Record<string, string> = {
+  owner: "拥有者",
+  admin: "管理员",
+  editor: "编辑者",
+  viewer: "只读"
+}
+const EDITABLE_ROLES = [
+  { value: "admin", label: "管理员" },
+  { value: "editor", label: "编辑者" },
+  { value: "viewer", label: "只读" }
+]
 
-// 团队数据结构
-interface TeamData {
-  id: number
+interface OrgNode {
+  id: string
   name: string
   ownerName: string
   memberCount: number
+  kbCount: number
+  fileCount: number
+  description: string
+  parentId: string | null
+  ownerId?: string
   createTime: string
-  updateTime: string
+  children: OrgNode[]
+}
+interface TeamMember { userId: string; username: string; email: string; role: string; joinTime: string; orgNames?: string[]; isDescendant?: boolean }
+interface KbItem { id: string; name: string; description: string; docNum: number; tokenNum: number; chunkNum: number; creatorName: string; createTime: string; orgName?: string; isDescendant?: boolean }
+interface FileItem { id: string; name: string; size: number; type: string; run: string; progress: number; kbName: string; createTime: string; orgName?: string; isDescendant?: boolean }
+
+// ==================== 视图状态 ====================
+const currentView = ref<string>("tree")
+const selectedOrg = ref<OrgNode | null>(null)
+
+function openDetail(row: OrgNode, view: string) {
+  selectedOrg.value = row
+  currentView.value = view
+  if (view === "members") fetchMembers(row.id)
+  else if (view === "kbs") fetchKbs(row.id)
+  else if (view === "files") fetchFiles(row.id)
 }
 
-// 团队成员数据结构
-interface TeamMember {
-  userId: number
-  username: string
-  role: string
-  joinTime: string
+function goBack() {
+  currentView.value = "tree"
+  selectedOrg.value = null
 }
 
-//  删
-function handleDelete() {
-  ElMessage.success("如需解散该团队，可直接删除负责人账号")
-}
+// ==================== 树数据 ====================
+const loading = ref(false)
+const treeData = ref<OrgNode[]>([])
+const searchKeyword = ref("")
 
-const tableData = ref<TeamData[]>([])
-
-const searchData = reactive({
-  name: ""
-})
-
-// 排序状态
-const sortData = reactive({
-  sortBy: "create_date",
-  sortOrder: "desc" // 默认排序顺序 (最新创建的在前)
-})
-
-// 存储多选的表格数据
-const multipleSelection = ref<TeamData[]>([])
-
-function getTableData() {
+function loadTree() {
   loading.value = true
+  getOrgTreeApi()
+    .then((res: any) => { treeData.value = res.data || []; setupRowDraggable() })
+    .catch(() => { treeData.value = [] })
+    .finally(() => { loading.value = false })
+}
 
-  getTableDataApi({
-    currentPage: paginationData.currentPage,
-    size: paginationData.pageSize,
-    name: searchData.name,
-    sort_by: sortData.sortBy,
-    sort_order: sortData.sortOrder
-  }).then(({ data }) => {
-    paginationData.total = data.total
-    tableData.value = data.list.map((item: any) => ({
-      id: item.id,
-      name: item.name,
-      ownerName: item.ownerName,
-      memberCount: item.memberCount,
-      createTime: item.createTime,
-      updateTime: item.updateTime
-    }))
-    // 清空选中数据
-    multipleSelection.value = []
-  }).catch(() => {
-    tableData.value = []
-  }).finally(() => {
-    loading.value = false
+function filterTree(nodes: OrgNode[], keyword: string): OrgNode[] {
+  if (!keyword) return nodes
+  const lowerKw = keyword.toLowerCase()
+  return nodes.reduce<OrgNode[]>((acc, node) => {
+    const filteredChildren = filterTree(node.children || [], keyword)
+    if (node.name.toLowerCase().includes(lowerKw) || filteredChildren.length > 0) {
+      acc.push({ ...node, children: filteredChildren })
+    }
+    return acc
+  }, [])
+}
+const filteredTreeData = computed(() => filterTree(treeData.value, searchKeyword.value))
+const defaultExpandKeys = computed(() => treeData.value.map(n => n.id))
+onMounted(loadTree)
+
+// ==================== 拖拽 ====================
+const draggedOrg = ref<OrgNode | null>(null)
+
+function findOrgById(nodes: OrgNode[], id: string): OrgNode | null {
+  for (const n of nodes) {
+    if (n.id === id) return n
+    const found = findOrgById(n.children || [], id)
+    if (found) return found
+  }
+  return null
+}
+
+function isDescendant(ancestor: OrgNode, targetId: string): boolean {
+  for (const c of (ancestor.children || [])) {
+    if (c.id === targetId) return true
+    if (isDescendant(c, targetId)) return true
+  }
+  return false
+}
+
+function getRowClassName({ row }: { row: OrgNode }) {
+  return `drag-row drag-row-${row.id}`
+}
+
+function setupRowDraggable() {
+  nextTick(() => {
+    const rows = document.querySelectorAll(".drag-row")
+    rows.forEach((tr) => {
+      tr.setAttribute("draggable", "true")
+    })
   })
 }
 
-function handleSearch() {
-  paginationData.currentPage === 1 ? getTableData() : (paginationData.currentPage = 1)
+function handleDragStart(e: DragEvent) {
+  const target = e.target as HTMLElement
+  // 如果点击的是按钮、链接、图标等交互元素，不触发拖拽
+  if (target.closest("button, a, .el-button, .el-dropdown, .count-link, .el-icon")) {
+    e.preventDefault()
+    return
+  }
+  const tr = target.closest("tr")
+  if (!tr) return
+  const match = tr.className.match(/drag-row-([\da-f]+)/)
+  if (!match) return
+  const row = findOrgById(treeData.value, match[1])
+  if (!row) return
+  draggedOrg.value = row
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = "move"
+    e.dataTransfer.setData("text/plain", row.id)
+  }
 }
 
-const searchFormRef = ref<FormInstance | null>(null)
-function resetSearch() {
-  searchFormRef.value?.resetFields()
-  handleSearch()
+function handleTableDragOver(e: DragEvent) {
+  e.preventDefault()
+  if (!e.dataTransfer) return
+  e.dataTransfer.dropEffect = "move"
+  // 高亮当前行
+  const tr = (e.target as HTMLElement).closest("tr")
+  if (!tr) return
+  // 清除其他高亮
+  document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"))
+  tr.classList.add("drag-over")
 }
 
-// 表格多选事件处理
-function handleSelectionChange(selection: TeamData[]) {
-  multipleSelection.value = selection
+function handleTableDragLeave(e: DragEvent) {
+  const tr = (e.target as HTMLElement).closest("tr")
+  if (tr) tr.classList.remove("drag-over")
 }
-// 团队成员管理相关
-const memberDialogVisible = ref<boolean>(false)
-const currentTeam = ref<TeamData | null>(null)
+
+function handleTableDrop(e: DragEvent) {
+  e.preventDefault()
+  document.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"))
+  if (!draggedOrg.value) return
+
+  const tr = (e.target as HTMLElement).closest("tr")
+  if (!tr) return
+
+  const match = tr.className.match(/drag-row-([\da-f]+)/)
+  if (!match) return
+
+  const targetId = match[1]
+  const dragged = draggedOrg.value
+  draggedOrg.value = null
+
+  if (dragged.id === targetId) return
+  if (isDescendant(dragged, targetId)) {
+    ElMessage.warning("不能移动到自身的子组织下")
+    return
+  }
+
+  const targetOrg = findOrgById(treeData.value, targetId)
+  if (!targetOrg) return
+
+  ElMessageBox.confirm(`确认将「${dragged.name}」移动到「${targetOrg.name}」下？`, "移动组织", {
+    confirmButtonText: "确定", cancelButtonText: "取消", type: "info"
+  }).then(() => {
+    updateTeamApi(dragged.id, { parent_id: targetId })
+      .then(() => { ElMessage.success("移动成功"); loadTree() })
+      .catch(() => { ElMessage.error("移动失败") })
+  })
+}
+
+// ==================== 成员 ====================
 const teamMembers = ref<TeamMember[]>([])
-const memberLoading = ref<boolean>(false)
-// 添加成员相关状态
-const addMemberDialogVisible = ref<boolean>(false)
-const userList = ref<{ id: number, username: string }[]>([])
-const userLoading = ref<boolean>(false)
-const selectedUser = ref<number | undefined>(undefined)
-const selectedRole = ref<string>("normal")
+const memberLoading = ref(false)
 
-// 计算属性：过滤出可添加的用户（不在当前团队成员列表中的用户）
+function fetchMembers(teamId: string) {
+  memberLoading.value = true
+  getTeamMembersApi(teamId as any)
+    .then((res: any) => {
+      if (res.data && Array.isArray(res.data.list)) teamMembers.value = res.data.list
+      else if (Array.isArray(res.data)) teamMembers.value = res.data
+      else teamMembers.value = []
+    })
+    .catch(() => { teamMembers.value = [] })
+    .finally(() => { memberLoading.value = false })
+}
+
+function handleRoleChange(member: TeamMember, newRole: string) {
+  if (!selectedOrg.value) return
+  updateMemberRoleApi(selectedOrg.value.id, member.userId, newRole)
+    .then(() => { ElMessage.success("角色修改成功"); fetchMembers(selectedOrg.value!.id) })
+    .catch(() => { ElMessage.error("角色修改失败"); fetchMembers(selectedOrg.value!.id) })
+}
+
+function handleRemoveMember(member: TeamMember) {
+  ElMessageBox.confirm(`确认将「${member.username}」从组织中移除吗？`, "提示", {
+    confirmButtonText: "确定", cancelButtonText: "取消", type: "warning"
+  }).then(() => {
+    if (!selectedOrg.value) return
+    removeTeamMemberApi({ teamId: selectedOrg.value.id as any, memberId: member.userId as any })
+      .then(() => { ElMessage.success("成员移除成功"); fetchMembers(selectedOrg.value!.id); loadTree() })
+  })
+}
+
+// ==================== 添加成员 ====================
+const addMemberDialogVisible = ref(false)
+const userList = ref<{ id: string; username: string }[]>([])
+const userLoading = ref(false)
+const selectedUser = ref<string | undefined>(undefined)
+const selectedRole = ref("viewer")
 const availableUsers = computed(() => {
-  const memberUserIds = new Set(teamMembers.value.map(member => member.userId))
-  return userList.value.filter(user => !memberUserIds.has(user.id))
+  const memberIds = new Set(teamMembers.value.map((m) => m.userId))
+  return userList.value.filter((u) => !memberIds.has(u.id))
 })
 
-function handleManageMembers(row: TeamData) {
-  currentTeam.value = row
-  memberDialogVisible.value = true
-  getTeamMembers(row.id)
-}
-
-// 获取团队成员列表
-function getTeamMembers(teamId: number) {
-  memberLoading.value = true
-  getTeamMembersApi(teamId)
-    .then((response: any) => {
-      if (response.data && Array.isArray(response.data.list)) {
-        teamMembers.value = response.data.list
-      } else if (Array.isArray(response.data)) {
-        teamMembers.value = response.data
-      } else {
-        teamMembers.value = []
-      }
-    })
-    .catch(() => {
-      teamMembers.value = []
-    })
-    .finally(() => {
-      memberLoading.value = false
-    })
-}
-
-// 添加成员
 function handleAddMember() {
-  // 打开添加成员对话框
   addMemberDialogVisible.value = true
-  // 获取可添加的用户列表
-  getUserList()
-}
-
-// 获取用户列表
-function getUserList() {
+  selectedUser.value = undefined
+  selectedRole.value = "viewer"
   userLoading.value = true
-  // 调用 getUsersApi 时传递 size 参数以获取所有用户
-  getUsersApi({ size: 99999 }).then((res: any) => {
-    if (res.data) {
-      userList.value = res.data.list
-    } else {
-      userList.value = []
-    }
-  }).catch(() => {
-    userList.value = []
-  }).finally(() => {
-    userLoading.value = false
-  })
+  getUsersApi({ size: 99999 })
+    .then((res: any) => { userList.value = res.data?.list || [] })
+    .catch(() => { userList.value = [] })
+    .finally(() => { userLoading.value = false })
 }
 
-// 确认添加成员
 function confirmAddMember() {
-  if (!selectedUser.value) {
-    ElMessage.warning("请选择要添加的用户")
-    return
-  }
-
-  if (!currentTeam.value) {
-    ElMessage.error("当前团队信息不存在")
-    return
-  }
-
-  // 调用添加成员API
-  addTeamMemberApi({
-    teamId: currentTeam.value.id,
-    userId: selectedUser.value,
-    role: selectedRole.value
-  }).then(() => {
-    ElMessage.success("添加成员成功")
-    // 关闭对话框
-    addMemberDialogVisible.value = false
-    // 重新获取成员列表
-    getTeamMembers(currentTeam.value!.id)
-    // 刷新团队列表（更新成员数量）
-    getTableData()
-    // 重置选择
-    selectedUser.value = undefined
-    selectedRole.value = "normal"
-  }).catch((error) => {
-    console.error("添加成员失败:", error)
-    ElMessage.error("添加成员失败")
-  })
-}
-
-// 移除成员
-function handleRemoveMember(member: TeamMember) {
-  ElMessageBox.confirm(`确认将 ${member.username} 从团队中移除吗？`, "提示", {
-    confirmButtonText: "确定",
-    cancelButtonText: "取消",
-    type: "warning"
-  }).then(() => {
-    if (!currentTeam.value || !currentTeam.value.id) {
-      ElMessage.error("当前团队信息不存在")
-      return
-    }
-    removeTeamMemberApi({
-      teamId: currentTeam.value.id,
-      memberId: member.userId
-    }).then(() => {
-      ElMessage.success("成员移除成功")
-      // 重新获取成员列表
-      if (currentTeam.value) {
-        getTeamMembers(currentTeam.value.id)
-      }
-      getTableData()
+  if (!selectedUser.value) { ElMessage.warning("请选择要添加的用户"); return }
+  if (!selectedOrg.value) return
+  addTeamMemberApi({ teamId: selectedOrg.value.id as any, userId: selectedUser.value as any, role: selectedRole.value })
+    .then(() => {
+      ElMessage.success("添加成员成功")
+      addMemberDialogVisible.value = false
+      fetchMembers(selectedOrg.value!.id)
+      loadTree()
     })
+    .catch(() => { ElMessage.error("添加成员失败") })
+}
+
+// ==================== 知识库 ====================
+const kbList = ref<KbItem[]>([])
+const kbLoading = ref(false)
+
+function fetchKbs(orgId: string) {
+  kbLoading.value = true
+  getOrgKnowledgebasesApi(orgId)
+    .then((res: any) => { kbList.value = Array.isArray(res.data) ? res.data : [] })
+    .catch(() => { kbList.value = [] })
+    .finally(() => { kbLoading.value = false })
+}
+
+// ==================== 文件 ====================
+const fileList = ref<FileItem[]>([])
+const fileLoading = ref(false)
+
+function fetchFiles(orgId: string) {
+  fileLoading.value = true
+  getOrgFilesApi(orgId)
+    .then((res: any) => { fileList.value = Array.isArray(res.data) ? res.data : [] })
+    .catch(() => { fileList.value = [] })
+    .finally(() => { fileLoading.value = false })
+}
+
+function formatSize(bytes: number) {
+  if (!bytes) return "0"
+  if (bytes < 1024) return bytes + " B"
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB"
+  return (bytes / 1024 / 1024).toFixed(1) + " MB"
+}
+
+// ==================== 创建知识库 ====================
+const createKbDialogVisible = ref(false)
+const createKbLoading = ref(false)
+const createKbForm = reactive({ name: "", description: "" })
+
+function handleCreateKb() {
+  createKbForm.name = ""
+  createKbForm.description = ""
+  createKbDialogVisible.value = true
+}
+
+function confirmCreateKb() {
+  if (!createKbForm.name.trim()) { ElMessage.warning("请输入知识库名称"); return }
+  if (!selectedOrg.value) return
+  createKbLoading.value = true
+  createKnowledgeBaseApi({
+    name: createKbForm.name,
+    description: createKbForm.description,
+    org_id: selectedOrg.value.id
+  } as any)
+    .then(() => {
+      ElMessage.success("知识库创建成功")
+      createKbDialogVisible.value = false
+      fetchKbs(selectedOrg.value!.id)
+      loadTree()
+    })
+    .catch(() => { ElMessage.error("创建知识库失败") })
+    .finally(() => { createKbLoading.value = false })
+}
+
+// ==================== 上传文件 ====================
+const uploadDialogVisible = ref(false)
+const uploadLoading = ref(false)
+const uploadKbId = ref<string | undefined>(undefined)
+const uploadFiles = ref<File[]>([])
+
+function handleUploadFile() {
+  uploadKbId.value = undefined
+  uploadFiles.value = []
+  uploadDialogVisible.value = true
+  if (selectedOrg.value) fetchKbs(selectedOrg.value.id)
+}
+
+function onFileChange(file: any) {
+  uploadFiles.value.push(file.raw)
+}
+
+function onFileRemove(file: any) {
+  uploadFiles.value = uploadFiles.value.filter(f => f.name !== file.name)
+}
+
+function confirmUploadFile() {
+  if (!uploadKbId.value) { ElMessage.warning("请选择目标知识库"); return }
+  if (uploadFiles.value.length === 0) { ElMessage.warning("请选择要上传的文件"); return }
+  uploadLoading.value = true
+  const formData = new FormData()
+  uploadFiles.value.forEach(f => formData.append("files", f))
+  uploadFileApiV2(formData)
+    .then((res: any) => {
+      const fileIds = (res.data || []).map((f: any) => f.id).filter(Boolean)
+      if (fileIds.length === 0) { ElMessage.error("上传失败"); return }
+      return addDocumentToKnowledgeBaseApi({ kb_id: uploadKbId.value!, file_ids: fileIds })
+    })
+    .then(() => {
+      ElMessage.success("文件上传成功")
+      uploadDialogVisible.value = false
+      if (selectedOrg.value) fetchFiles(selectedOrg.value.id)
+      loadTree()
+    })
+    .catch(() => { ElMessage.error("上传失败") })
+    .finally(() => { uploadLoading.value = false })
+}
+
+// ==================== 创建/编辑组织 ====================
+const createDialogVisible = ref(false)
+const createFormRef = ref<FormInstance | null>(null)
+const createLoading = ref(false)
+const parentLocked = ref(false)
+const isEdit = ref(false)
+const editingOrgId = ref("")
+const createFormData = reactive({
+  name: "",
+  description: "",
+  owner_id: undefined as string | undefined,
+  parent_id: undefined as string | undefined
+})
+const ownerUserList = ref<{ id: string; username: string }[]>([])
+
+function getFilteredTreeForEdit(nodes: OrgNode[], excludeId: string): OrgNode[] {
+  return nodes.reduce<OrgNode[]>((acc, node) => {
+    if (node.id === excludeId) return acc
+    const filtered = getFilteredTreeForEdit(node.children || [], excludeId)
+    acc.push({ ...node, children: filtered })
+    return acc
+  }, [])
+}
+const editTreeData = computed(() => {
+  if (isEdit.value && editingOrgId.value) {
+    return getFilteredTreeForEdit(treeData.value, editingOrgId.value)
+  }
+  return treeData.value
+})
+
+function handleOpenCreate() {
+  isEdit.value = false
+  parentLocked.value = false
+  createFormData.name = ""
+  createFormData.description = ""
+  createFormData.owner_id = undefined
+  createFormData.parent_id = undefined
+  createDialogVisible.value = true
+  fetchOwnerUsers()
+}
+
+function handleAddChild(row: OrgNode) {
+  isEdit.value = false
+  parentLocked.value = true
+  createFormData.name = ""
+  createFormData.description = ""
+  createFormData.owner_id = undefined
+  createFormData.parent_id = row.id
+  createDialogVisible.value = true
+  fetchOwnerUsers()
+}
+
+function handleEdit(row: OrgNode) {
+  isEdit.value = true
+  editingOrgId.value = row.id
+  parentLocked.value = false
+  createFormData.name = row.name
+  createFormData.description = row.description || ""
+  createFormData.owner_id = row.ownerId || undefined
+  createFormData.parent_id = row.parentId || undefined
+  createDialogVisible.value = true
+  fetchOwnerUsers()
+}
+
+function fetchOwnerUsers() {
+  getUsersApi({ size: 99999 }).then((res: any) => {
+    if (res.data) ownerUserList.value = res.data.list
   })
 }
 
-/**
- * @description 处理表格排序变化事件（只允许正序和倒序切换）
- * @param {object} sortInfo 排序信息对象，包含 prop 和 order
- * @param {string} sortInfo.prop 排序的字段名
- * @param {string | null} sortInfo.order 排序的顺序 ('ascending', 'descending', null)
- */
-function handleSortChange({ prop }: { prop: string, order: string | null }) {
-  // 如果点击的是同一个字段，则切换排序顺序
-  if (sortData.sortBy === prop) {
-    // 当前为正序则切换为倒序，否则切换为正序
-    sortData.sortOrder = sortData.sortOrder === "asc" ? "desc" : "asc"
-  } else {
-    // 切换字段时，默认正序
-    sortData.sortBy = prop
-    sortData.sortOrder = "asc"
-  }
-  getTableData()
+function handleSaveOrg() {
+  createFormRef.value?.validate((valid) => {
+    if (!valid) return
+    createLoading.value = true
+    if (isEdit.value) {
+      updateTeamApi(editingOrgId.value, {
+        name: createFormData.name,
+        description: createFormData.description,
+        owner_id: createFormData.owner_id,
+        parent_id: createFormData.parent_id || null
+      })
+        .then(() => { ElMessage.success("组织更新成功"); createDialogVisible.value = false; loadTree() })
+        .catch(() => { ElMessage.error("组织更新失败") })
+        .finally(() => { createLoading.value = false })
+    } else {
+      createTeamApi({
+        name: createFormData.name,
+        description: createFormData.description,
+        owner_id: createFormData.owner_id,
+        parent_id: createFormData.parent_id
+      })
+        .then(() => { ElMessage.success("创建组织成功"); createDialogVisible.value = false; loadTree() })
+        .catch(() => { ElMessage.error("创建组织失败") })
+        .finally(() => { createLoading.value = false })
+    }
+  })
 }
 
-// 监听分页参数的变化
-watch([() => paginationData.currentPage, () => paginationData.pageSize], getTableData, { immediate: true })
+function handleDelete(row: OrgNode) {
+  const hasChildren = row.children && row.children.length > 0
+  const msg = hasChildren
+    ? `确认删除「${row.name}」及其所有子组织？此操作不可恢复。`
+    : `确认删除组织「${row.name}」？此操作将同时移除所有成员关联。`
+  ElMessageBox.confirm(msg, "提示", {
+    confirmButtonText: "确定", cancelButtonText: "取消", type: "warning"
+  }).then(() => {
+    deleteTeamApi(row.id)
+      .then(() => { ElMessage.success("删除成功"); loadTree() })
+      .catch(() => { ElMessage.error("删除失败") })
+  })
+}
+
+function handleDropdownCommand(command: string, row: OrgNode) {
+  if (command === "members") openDetail(row, "members")
+  else if (command === "kbs") openDetail(row, "kbs")
+  else if (command === "files") openDetail(row, "files")
+  else if (command === "delete") handleDelete(row)
+}
 </script>
 
 <template>
   <div class="app-container">
-    <el-card v-loading="loading" shadow="never" class="search-wrapper">
-      <el-form ref="searchFormRef" :inline="true" :model="searchData">
-        <el-form-item prop="name" label="团队名称">
-          <el-input v-model="searchData.name" placeholder="请输入" />
+
+    <!-- ====== 视图1: 组织树 ====== -->
+    <template v-if="currentView === 'tree'">
+      <el-card v-loading="loading" shadow="never">
+        <div class="toolbar-wrapper">
+          <el-button type="primary" :icon="CirclePlus" @click="handleOpenCreate">创建组织</el-button>
+          <div class="toolbar-right">
+            <el-input v-model="searchKeyword" placeholder="搜索组织名称" :prefix-icon="Search" clearable style="width: 240px" />
+            <el-button :icon="Refresh" circle @click="loadTree" />
+          </div>
+        </div>
+        <el-table
+          :data="filteredTreeData"
+          row-key="id"
+          :tree-props="{ children: 'children' }"
+          :default-expand-all="false"
+          :expand-row-keys="defaultExpandKeys"
+          :row-class-name="getRowClassName"
+          border
+          @dragstart="handleDragStart"
+          @dragover.prevent="handleTableDragOver"
+          @dragleave="handleTableDragLeave"
+          @drop="handleTableDrop"
+        >
+          <el-table-column prop="name" label="组织名称" min-width="200" />
+          <el-table-column prop="ownerName" label="负责人" width="120" align="center" />
+          <el-table-column label="成员" width="80" align="center">
+            <template #default="{ row }">
+              <span class="count-link" @click="openDetail(row, 'members')">{{ row.memberCount }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="知识库" width="80" align="center">
+            <template #default="{ row }">
+              <span class="count-link" @click="openDetail(row, 'kbs')">{{ row.kbCount }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="文件" width="80" align="center">
+            <template #default="{ row }">
+              <span class="count-link" @click="openDetail(row, 'files')">{{ row.fileCount }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="description" label="描述" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="createTime" label="创建时间" width="170" align="center" />
+          <el-table-column fixed="right" label="操作" width="220" align="center">
+            <template #default="{ row }">
+              <el-button type="primary" text bg size="small" :icon="Edit" @click="handleEdit(row)">编辑</el-button>
+              <el-button type="primary" text bg size="small" :icon="CirclePlus" @click="handleAddChild(row)">子组织</el-button>
+              <el-dropdown trigger="click" @command="(cmd: string) => handleDropdownCommand(cmd, row)">
+                <el-button type="info" text bg size="small" :icon="MoreFilled" style="margin-left: 8px" />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="members">成员管理</el-dropdown-item>
+                    <el-dropdown-item command="kbs">知识库</el-dropdown-item>
+                    <el-dropdown-item command="files">文件列表</el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>
+                      <span style="color: var(--el-color-danger)">删除组织</span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </template>
+
+    <!-- ====== 视图2: 成员列表 ====== -->
+    <template v-else-if="currentView === 'members' && selectedOrg">
+      <el-card shadow="never">
+        <div class="detail-toolbar">
+          <div class="detail-back">
+            <el-button :icon="ArrowLeft" @click="goBack">返回</el-button>
+            <span class="detail-title">{{ selectedOrg.name }} - 成员列表</span>
+          </div>
+          <el-button type="primary" :icon="CirclePlus" @click="handleAddMember">添加成员</el-button>
+        </div>
+        <el-table :data="teamMembers" v-loading="memberLoading" style="width: 100%">
+          <el-table-column prop="username" label="用户名" align="center" />
+          <el-table-column prop="email" label="邮箱" align="center" />
+          <el-table-column label="所属组织" min-width="180" align="center">
+            <template #default="{ row }">
+              <el-tag v-for="name in (row.orgNames || [])" :key="name" size="small" style="margin: 2px" :type="name === selectedOrg?.name ? '' : 'info'">{{ name }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="角色" width="140" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="row.role === 'owner'" type="warning" size="small">{{ ROLE_MAP[row.role] }}</el-tag>
+              <el-select v-else :model-value="row.role" size="small" style="width: 100px" @change="(val: string) => handleRoleChange(row, val)">
+                <el-option v-for="r in EDITABLE_ROLES" :key="r.value" :label="r.label" :value="r.value" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column prop="joinTime" label="加入时间" width="170" align="center" />
+          <el-table-column fixed="right" label="操作" width="80" align="center">
+            <template #default="{ row }">
+              <el-button type="danger" text bg size="small" :disabled="row.role === 'owner'" @click="handleRemoveMember(row)">移除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-empty v-if="teamMembers.length === 0 && !memberLoading" description="暂无成员" />
+      </el-card>
+    </template>
+
+    <!-- ====== 视图3: 知识库卡片 ====== -->
+    <template v-else-if="currentView === 'kbs' && selectedOrg">
+      <el-card shadow="never">
+        <div class="detail-toolbar">
+          <div class="detail-back">
+            <el-button :icon="ArrowLeft" @click="goBack">返回</el-button>
+            <span class="detail-title">{{ selectedOrg.name }} - 知识库</span>
+          </div>
+          <el-button type="primary" :icon="CirclePlus" @click="handleCreateKb">创建知识库</el-button>
+        </div>
+        <div v-loading="kbLoading">
+          <div v-if="kbList.length > 0" class="kb-card-grid">
+            <el-card v-for="kb in kbList" :key="kb.id" shadow="hover" class="kb-card">
+              <template #header>
+                <div class="kb-card-header">
+                  <span class="kb-card-title">{{ kb.name }}</span>
+                  <el-tag v-if="kb.isDescendant" type="info" size="small">{{ kb.orgName }}</el-tag>
+                </div>
+              </template>
+              <p v-if="kb.description" class="kb-desc">{{ kb.description }}</p>
+              <div class="kb-meta">
+                <span>文档: {{ kb.docNum }}</span>
+                <span>分块: {{ kb.chunkNum }}</span>
+                <span>创建者: {{ kb.creatorName }}</span>
+              </div>
+              <div class="kb-time">{{ kb.createTime }}</div>
+            </el-card>
+          </div>
+          <el-empty v-else description="暂无知识库" />
+        </div>
+      </el-card>
+    </template>
+
+    <!-- ====== 视图4: 文件列表 ====== -->
+    <template v-else-if="currentView === 'files' && selectedOrg">
+      <el-card shadow="never">
+        <div class="detail-toolbar">
+          <div class="detail-back">
+            <el-button :icon="ArrowLeft" @click="goBack">返回</el-button>
+            <span class="detail-title">{{ selectedOrg.name }} - 文件列表</span>
+          </div>
+          <el-button type="primary" :icon="Upload" @click="handleUploadFile">上传文件</el-button>
+        </div>
+        <div v-loading="fileLoading">
+          <el-table v-if="fileList.length > 0" :data="fileList" style="width: 100%">
+            <el-table-column prop="name" label="文件名" min-width="200" show-overflow-tooltip />
+            <el-table-column label="所属组织" width="180" align="center">
+              <template #default="{ row }">
+                <span>{{ row.orgName }}</span>
+                <el-tag v-if="row.isDescendant" type="info" size="small" style="margin-left: 4px">子</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="大小" width="100" align="center">
+              <template #default="{ row }">{{ formatSize(row.size) }}</template>
+            </el-table-column>
+            <el-table-column prop="kbName" label="所属知识库" width="150" show-overflow-tooltip />
+            <el-table-column label="解析进度" width="120" align="center">
+              <template #default="{ row }">
+                <el-progress v-if="row.progress > 0 && row.progress < 1" :percentage="Math.round(row.progress * 100)" :stroke-width="6" />
+                <el-tag v-else-if="row.progress >= 1" type="success" size="small">已完成</el-tag>
+                <el-tag v-else type="info" size="small">未解析</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="createTime" label="创建时间" width="170" align="center" />
+          </el-table>
+          <el-empty v-else description="暂无文件" />
+        </div>
+      </el-card>
+    </template>
+
+    <!-- 创建/编辑组织弹窗 -->
+    <el-dialog v-model="createDialogVisible" :title="isEdit ? '编辑组织' : (parentLocked ? '添加子组织' : '创建组织')" width="480px" destroy-on-close>
+      <el-form ref="createFormRef" :model="createFormData" label-width="80px">
+        <el-form-item label="组织名称" prop="name" :rules="[{ required: true, message: '请输入组织名称', trigger: 'blur' }]">
+          <el-input v-model="createFormData.name" placeholder="如：电力运维部" />
         </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :icon="Search" @click="handleSearch">
-            查询
-          </el-button>
-          <el-button :icon="Refresh" @click="resetSearch">
-            重置
-          </el-button>
+        <el-form-item label="描述">
+          <el-input v-model="createFormData.description" type="textarea" :rows="2" placeholder="组织描述（可选）" />
+        </el-form-item>
+        <el-form-item label="负责人">
+          <el-select v-model="createFormData.owner_id" placeholder="不选则为当前用户" style="width: 100%" filterable clearable>
+            <el-option v-for="user in ownerUserList" :key="user.id" :label="user.username" :value="user.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="上级组织">
+          <el-tree-select
+            v-model="createFormData.parent_id"
+            :data="editTreeData"
+            :props="{ label: 'name', value: 'id', children: 'children' }"
+            placeholder="不选则为根组织"
+            check-strictly clearable
+            :disabled="parentLocked"
+            style="width: 100%"
+          />
         </el-form-item>
       </el-form>
-    </el-card>
-
-    <el-card v-loading="loading" shadow="never">
-      <div class="table-wrapper">
-        <el-table :data="tableData" @selection-change="handleSelectionChange" @sort-change="handleSortChange">
-          <el-table-column type="selection" width="50" align="center" />
-          <el-table-column prop="name" label="团队名称" align="center" sortable="custom"/>
-          <el-table-column prop="ownerName" label="负责人" align="center" sortable="custom"/>
-          <el-table-column prop="memberCount" label="成员数量" align="center" sortable="custom"/>
-          <el-table-column prop="createTime" label="创建时间" align="center" sortable="custom"/>
-          <el-table-column prop="updateTime" label="更新时间" align="center" sortable="custom"/>
-          <el-table-column fixed="right" label="操作" width="220" align="center">
-            <template #default="scope">
-              <el-button type="success" text bg size="small" :icon="UserFilled" @click="handleManageMembers(scope.row)">
-                成员管理
-              </el-button>
-              <el-button type="danger" text bg size="small" @click="handleDelete()">
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-      <div class="pager-wrapper">
-        <el-pagination
-          background
-          :layout="paginationData.layout"
-          :page-sizes="paginationData.pageSizes"
-          :total="paginationData.total"
-          :page-size="paginationData.pageSize"
-          :current-page="paginationData.currentPage"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
-      </div>
-    </el-card>
-
-    <!-- 团队成员管理 -->
-    <el-dialog
-      v-model="memberDialogVisible"
-      :title="`${currentTeam?.name || ''} - 成员管理`"
-      width="50%"
-    >
-      <div v-if="currentTeam">
-        <div class="team-info">
-          <p><strong>团队名称：</strong>{{ currentTeam.name }}</p>
-          <p><strong>负责人：</strong>{{ currentTeam.ownerName }}</p>
-        </div>
-
-        <div class="member-toolbar">
-          <el-button type="primary" :icon="CirclePlus" size="small" @click="handleAddMember">
-            添加成员
-          </el-button>
-        </div>
-
-        <el-table :data="teamMembers" style="width: 100%" v-loading="memberLoading">
-          <el-table-column prop="username" label="用户名" align="center" />
-          <el-table-column prop="role" label="角色" align="center">
-            <template #default="scope">
-              {{ scope.row.role === 'owner' ? '拥有者' : (scope.row.role === 'normal' ? '普通成员' : scope.row.role) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="joinTime" label="加入时间" align="center" />
-          <el-table-column fixed="right" label="操作" width="150" align="center">
-            <template #default="scope">
-              <el-button
-                type="danger"
-                text
-                bg
-                size="small"
-                @click="handleRemoveMember(scope.row)"
-                :disabled="scope.row.role === 'owner'"
-              >
-                移除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div v-if="teamMembers.length === 0" class="empty-data">
-          <el-empty description="暂无成员数据" />
-        </div>
-      </div>
       <template #footer>
-        <el-button @click="memberDialogVisible = false">
-          关闭
-        </el-button>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createLoading" @click="handleSaveOrg">{{ isEdit ? '保存' : '创建' }}</el-button>
       </template>
     </el-dialog>
 
-    <!-- 添加成员对话框 -->
-    <el-dialog
-      v-model="addMemberDialogVisible"
-      title="添加团队成员"
-      width="30%"
-    >
+    <!-- 添加成员弹窗 -->
+    <el-dialog v-model="addMemberDialogVisible" title="添加成员" width="400px" destroy-on-close>
       <div v-loading="userLoading">
         <el-form label-width="80px">
           <el-form-item label="选择用户">
-            <!-- 修改 placeholder 属性，使其动态绑定 -->
-            <el-select
-              v-model="selectedUser"
-              :placeholder="availableUsers.length > 0 ? '请选择用户' : '(当前无添加的用户数据)'"
-              style="width: 100%"
-              :disabled="availableUsers.length === 0"
-            >
-              <el-option
-                v-for="user in availableUsers"
-                :key="user.id"
-                :label="user.username"
-                :value="user.id"
-              />
+            <el-select v-model="selectedUser" :placeholder="availableUsers.length > 0 ? '请选择用户' : '(无可添加的用户)'" style="width: 100%" :disabled="availableUsers.length === 0" filterable>
+              <el-option v-for="user in availableUsers" :key="user.id" :label="user.username" :value="user.id" />
             </el-select>
           </el-form-item>
           <el-form-item label="角色">
-            <el-radio-group v-model="selectedRole">
-              <el-radio label="normal">
-                普通成员
-              </el-radio>
-            </el-radio-group>
+            <el-select v-model="selectedRole" style="width: 100%">
+              <el-option v-for="r in EDITABLE_ROLES" :key="r.value" :label="r.label" :value="r.value" />
+            </el-select>
           </el-form-item>
         </el-form>
       </div>
       <template #footer>
-        <el-button @click="addMemberDialogVisible = false">
-          取消
-        </el-button>
-        <el-button type="primary" @click="confirmAddMember" :disabled="!selectedUser">
-          确认
-        </el-button>
+        <el-button @click="addMemberDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="!selectedUser" @click="confirmAddMember">确认</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 创建知识库弹窗 -->
+    <el-dialog v-model="createKbDialogVisible" title="创建知识库" width="440px" destroy-on-close>
+      <el-form label-width="80px">
+        <el-form-item label="名称" required>
+          <el-input v-model="createKbForm.name" placeholder="知识库名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="createKbForm.description" type="textarea" :rows="2" placeholder="知识库描述（可选）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createKbDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createKbLoading" @click="confirmCreateKb">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 上传文件弹窗 -->
+    <el-dialog v-model="uploadDialogVisible" title="上传文件" width="500px" destroy-on-close>
+      <el-form label-width="90px">
+        <el-form-item label="目标知识库" required>
+          <el-select v-model="uploadKbId" placeholder="选择知识库" style="width: 100%" filterable>
+            <el-option v-for="kb in kbList" :key="kb.id" :label="kb.name" :value="kb.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="选择文件" required>
+          <el-upload
+            :auto-upload="false"
+            multiple
+            :on-change="onFileChange"
+            :on-remove="onFileRemove"
+          >
+            <el-button type="primary" plain>选择文件</el-button>
+          </el-upload>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="uploadDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="uploadLoading" @click="confirmUploadFile">上传</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <style lang="scss" scoped>
-.el-alert {
-  margin-bottom: 20px;
-}
-
-.search-wrapper {
-  margin-bottom: 20px;
-  :deep(.el-card__body) {
-    padding-bottom: 2px;
-  }
-}
-
 .toolbar-wrapper {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
 }
-
-.table-wrapper {
-  margin-bottom: 20px;
-}
-
-.pager-wrapper {
+.toolbar-right {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+.count-link {
+  color: var(--el-color-primary);
+  cursor: pointer;
+  font-weight: 500;
+  &:hover { text-decoration: underline; }
 }
 
-.team-info {
+// 整行拖拽
+:deep(tr.drag-row) {
+  cursor: grab;
+  &:active { cursor: grabbing; }
+  .el-button, .el-dropdown, .count-link {
+    cursor: pointer;
+  }
+}
+
+// 拖拽高亮
+:deep(tr.drag-over) {
+  td {
+    background-color: var(--el-color-primary-light-8) !important;
+    border-top: 2px solid var(--el-color-primary) !important;
+  }
+}
+
+// 详情页
+.detail-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 20px;
-  padding: 15px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
+}
+.detail-back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-title {
+  font-size: 16px;
+  font-weight: 600;
 }
 
-.member-toolbar {
-  margin-bottom: 15px;
+// 知识库卡片
+.kb-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
 }
-
-.form-tip {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 5px;
-}
-
-.empty-data {
-  margin-top: 20px;
-  text-align: center;
+.kb-card {
+  .kb-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .kb-card-title {
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .kb-desc {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    margin-bottom: 8px;
+  }
+  .kb-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--el-text-color-regular);
+  }
+  .kb-time {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--el-text-color-placeholder);
+  }
 }
 </style>

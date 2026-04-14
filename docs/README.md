@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/ragflow-plus.png" width="400" alt="Ragflow-Plus">
+  <img src="images/ragflow-dtt.png" width="400" alt="Ragflow-DTT">
 </div>
 
 <div align="center">
@@ -12,7 +12,7 @@
 
 ## 🌟 简介
 
-Ragflow-Plus 是一个基于 Ragflow 的二次开发项目，目的是解决实际应用中的一些问题，主要有以下特点：
+Ragflow-DTT 是一个基于 Ragflow 的二次开发项目，目的是解决实际应用中的一些问题，主要有以下特点：
 
 - 管理模式  
 额外搭建后台管理系统，支持管理员执行用户管理、团队管理、配置管理、文件管理、知识库管理等功能

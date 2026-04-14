@@ -1,9 +1,9 @@
 # 贡献指南
 
-本文档提供了向 RAGFlow-Plus 提交贡献的指导原则和主要注意事项。
+本文档提供了向 Ragflow-DTT 提交贡献的指导原则和主要注意事项。
 
-- 如需报告错误，请通过[GitHub issue](https://github.com/zstar1003/ragflow-plus/issues/new/choose)提交问题。
-- 其他疑问可先在[Discussions](https://github.com/zstar1003/ragflow-plus/discussions)中查阅现有讨论或发起新话题。
+- 如需报告错误，请通过[GitHub issue](https://github.com/zstar1003/ragflow-dtt/issues/new/choose)提交问题。
+- 其他疑问可先在[Discussions](https://github.com/zstar1003/ragflow-dtt/discussions)中查阅现有讨论或发起新话题。
 
 ## 可贡献的内容
 
@@ -22,7 +22,7 @@
 
 1. Fork本GitHub仓库
 2. 将fork克隆到本地：  
-`git clone git@github.com:<你的用户名>/ragflow-plus.git`
+`git clone git@github.com:<你的用户名>/ragflow-dtt.git`
 3. 创建本地分支：  
 `git checkout -b my-branch`
 4. 提交信息需包含充分说明：  

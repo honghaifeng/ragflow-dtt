@@ -1,9 +1,9 @@
 <div align="center">
-  <img src="docs/images/ragflow-plus.png" width="400" alt="Ragflow-Plus">
+  <img src="docs/images/ragflow-dtt.png" width="400" alt="Ragflow-DTT">
 </div>
 
 <div align="center">
-  <a href="https://github.com/zstar1003/ragflow-plus/stargazers"><img src="https://img.shields.io/github/stars/zstar1003/ragflow-plus?style=social" alt="stars"></a>
+  <a href="https://github.com/zstar1003/ragflow-dtt/stargazers"><img src="https://img.shields.io/github/stars/zstar1003/ragflow-dtt?style=social" alt="stars"></a>
   <img src="https://img.shields.io/badge/version-0.5.0-blue" alt="version">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL3.0-green" alt="license"></a>
   <a href="https://hub.docker.com/r/zstar1003/ragflowplus/tags"><img src="https://img.shields.io/docker/pulls/zstar1003/ragflowplus" alt="docker pulls"></a>
@@ -19,7 +19,7 @@
 
 ## 🌟 Introduction
 
-**Ragflow-Plus** is a secondary development project based on **Ragflow**, aiming to solve some issues in real-world applications.  
+**Ragflow-DTT** is a secondary development project based on **Ragflow**, aiming to solve some issues in real-world applications.  
 Key features include:
 
 - **Management Mode**  
@@ -33,15 +33,15 @@ Key features include:
 - **Document Writing Mode**  
   Offers a brand new document-mode interactive experience.
 
-**In short:** Ragflow-Plus is the “industry-specific solution” of Ragflow for Chinese application scenarios.
+**In short:** Ragflow-DTT is the “industry-specific solution” of Ragflow for Chinese application scenarios.
 
 ## 📥 Usage
 
 Video demo & tutorial:  
 
-[![Ragflow-Plus Introduction and User Guide](https://i0.hdslb.com/bfs/archive/f7d8da4a112431af523bfb64043fe81da7dad8ee.jpg@672w_378h_1c.avif)](https://www.bilibili.com/video/BV1UJLezaEEE)
+[![Ragflow-DTT Introduction and User Guide](https://i0.hdslb.com/bfs/archive/f7d8da4a112431af523bfb64043fe81da7dad8ee.jpg@672w_378h_1c.avif)](https://www.bilibili.com/video/BV1UJLezaEEE)
 
-Project documentation: [xdxsb.top/ragflow-plus](https://xdxsb.top/ragflow-plus)
+Project documentation: [xdxsb.top/ragflow-dtt](https://xdxsb.top/ragflow-dtt)
 
 Quick start with Docker:
 ```bash
@@ -51,7 +51,7 @@ docker compose -f docker/docker-compose.yml up -d
 ## ❓ FAQ
 
 * For common issues, check [FAQ](docs/question/README.md) or search the GitHub issues section.
-* If not resolved, try using [DeepWiki](https://deepwiki.com/zstar1003/ragflow-plus) or [zread](https://zread.ai/zstar1003/ragflow-plus) to interact with the AI assistant, which can solve most common problems.
+* If not resolved, try using [DeepWiki](https://deepwiki.com/zstar1003/ragflow-dtt) or [zread](https://zread.ai/zstar1003/ragflow-dtt) to interact with the AI assistant, which can solve most common problems.
 * If the problem persists, submit a GitHub issue — the AI assistant will respond automatically.
 
 ## 🛠️ How to Contribute
@@ -60,7 +60,7 @@ docker compose -f docker/docker-compose.yml up -d
 2. Clone your fork locally:
 
    ```bash
-   git clone git@github.com:<your-username>/ragflow-plus.git
+   git clone git@github.com:<your-username>/ragflow-dtt.git
    ```
 3. Create a new branch:
 
@@ -89,8 +89,8 @@ This project is based on the following open-source projects:
 
 Thanks to all contributors:
 
-<a href="https://github.com/zstar1003/ragflow-plus/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=zstar1003/ragflow-plus" />
+<a href="https://github.com/zstar1003/ragflow-dtt/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=zstar1003/ragflow-dtt" />
 </a>
 
 ## 📜 License & Usage Restrictions
@@ -115,4 +115,4 @@ Thanks to all contributors:
 
 ## ✨ Star History
 
-![Stargazers over time](https://starchart.cc/zstar1003/ragflow-plus.svg)
+![Stargazers over time](https://starchart.cc/zstar1003/ragflow-dtt.svg)

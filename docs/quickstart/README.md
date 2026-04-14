@@ -2,7 +2,7 @@
 
 ## 1. 适合人群
 
-Ragflow-Plus 适合以下应用场景：
+Ragflow-DTT 适合以下应用场景：
 
 - 高校/企业等事业单位团队，需要构建一系列中心知识库通过在线API，增强现有大模型的回答效果。
 
@@ -25,7 +25,7 @@ Ragflow-Plus 适合以下应用场景：
 ### 1. 克隆项目代码
 
 ```bash
-git clone https://github.com/zstar1003/ragflow-plus.git
+git clone https://github.com/zstar1003/ragflow-dtt.git
 ```
 
 ### 2. 拉取镜像并启动
@@ -129,7 +129,7 @@ chat模型配置同理。
 
 ![文件解析截图](_images/image_5.png)
 
-解析的日志信息可在`docker\ragflow-plus-logs\parser.log`进行输出。
+解析的日志信息可在`docker\ragflow-dtt-logs\parser.log`进行输出。
 
 支持解析的文件类型包括：pdf，doc，docx，pptx，xlsx，csv，txt，md，jpg，png。
 

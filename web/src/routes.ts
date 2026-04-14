@@ -131,6 +131,10 @@ const routes = [
         component: '@/pages/evaluation',
       },
       {
+        path: '/organization',
+        component: '@/pages/organization',
+      },
+      {
         path: '/write',
         component: '@/pages/write',
         layout: false,

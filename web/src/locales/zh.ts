@@ -72,6 +72,7 @@ export default {
       search: '搜索',
       write: "文档撰写",
       evaluation: "问答评测",
+      organization: "组织管理",
     },
     knowledgeList: {
       welcome: '欢迎回来',

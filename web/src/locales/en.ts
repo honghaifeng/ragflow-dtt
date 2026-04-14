@@ -71,6 +71,7 @@ export default {
       flow: 'Agent',
       search: 'Search',
       evaluation: 'Evaluation',
+      organization: 'Organization',
     },
     knowledgeList: {
       welcome: 'Welcome back',

@@ -26,9 +26,11 @@ from datetime import datetime
 from flask import request
 from flask_login import current_user, login_required
 
+from peewee import CharField, TextField, BigIntegerField, FloatField, IntegerField
+
 from api import settings
 from api.db import StatusEnum
-from api.db.db_models import DB
+from api.db.db_models import DB, DataBaseModel
 from api.db.services.dialog_service import chat
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.dialog_service import DialogService
@@ -37,52 +39,52 @@ from api.utils.api_utils import get_json_result
 
 # ======================== 数据库表 ========================
 
-class EvaluationDataset(DB.Model):
+class EvaluationDataset(DataBaseModel):
     """评测数据集"""
-    id = DB.CharField(max_length=32, primary_key=True)
-    tenant_id = DB.CharField(max_length=32, null=False, index=True)
-    name = DB.CharField(max_length=255, null=False)
-    description = DB.TextField(null=True)
-    kb_ids = DB.TextField(null=True, help_text="关联知识库IDs, JSON数组")
-    dialog_id = DB.CharField(max_length=32, null=True, help_text="关联对话ID")
-    create_time = DB.BigIntegerField(null=True)
-    update_time = DB.BigIntegerField(null=True)
-    status = DB.CharField(max_length=1, default=StatusEnum.VALID.value)
+    id = CharField(max_length=32, primary_key=True)
+    tenant_id = CharField(max_length=32, null=False, index=True)
+    name = CharField(max_length=255, null=False)
+    description = TextField(null=True)
+    kb_ids = TextField(null=True, help_text="关联知识库IDs, JSON数组")
+    dialog_id = CharField(max_length=32, null=True, help_text="关联对话ID")
+    create_time = BigIntegerField(null=True)
+    update_time = BigIntegerField(null=True)
+    status = CharField(max_length=1, default=StatusEnum.VALID.value)
 
     class Meta:
         db_table = "evaluation_dataset"
 
 
-class EvaluationQA(DB.Model):
+class EvaluationQA(DataBaseModel):
     """评测问答对"""
-    id = DB.CharField(max_length=32, primary_key=True)
-    dataset_id = DB.CharField(max_length=32, null=False, index=True)
-    question = DB.TextField(null=False)
-    expected_answer = DB.TextField(null=False, help_text="标注的标准答案")
-    actual_answer = DB.TextField(null=True, help_text="系统生成的答案")
-    score = DB.FloatField(null=True, help_text="综合评分 0-1")
-    score_detail = DB.TextField(null=True, help_text="评分详情JSON")
-    reference_chunks = DB.TextField(null=True, help_text="检索到的chunk信息JSON")
-    status = DB.CharField(max_length=16, default="pending", help_text="pending/running/done/failed")
-    create_time = DB.BigIntegerField(null=True)
-    update_time = DB.BigIntegerField(null=True)
+    id = CharField(max_length=32, primary_key=True)
+    dataset_id = CharField(max_length=32, null=False, index=True)
+    question = TextField(null=False)
+    expected_answer = TextField(null=False, help_text="标注的标准答案")
+    actual_answer = TextField(null=True, help_text="系统生成的答案")
+    score = FloatField(null=True, help_text="综合评分 0-1")
+    score_detail = TextField(null=True, help_text="评分详情JSON")
+    reference_chunks = TextField(null=True, help_text="检索到的chunk信息JSON")
+    status = CharField(max_length=16, default="pending", help_text="pending/running/done/failed")
+    create_time = BigIntegerField(null=True)
+    update_time = BigIntegerField(null=True)
 
     class Meta:
         db_table = "evaluation_qa"
 
 
-class EvaluationRun(DB.Model):
+class EvaluationRun(DataBaseModel):
     """评测运行记录"""
-    id = DB.CharField(max_length=32, primary_key=True)
-    dataset_id = DB.CharField(max_length=32, null=False, index=True)
-    tenant_id = DB.CharField(max_length=32, null=False, index=True)
-    total = DB.IntegerField(default=0)
-    completed = DB.IntegerField(default=0)
-    avg_score = DB.FloatField(null=True)
-    accuracy = DB.FloatField(null=True, help_text="准确率(score>0.6的比例)")
-    status = DB.CharField(max_length=16, default="running")
-    create_time = DB.BigIntegerField(null=True)
-    update_time = DB.BigIntegerField(null=True)
+    id = CharField(max_length=32, primary_key=True)
+    dataset_id = CharField(max_length=32, null=False, index=True)
+    tenant_id = CharField(max_length=32, null=False, index=True)
+    total = IntegerField(default=0)
+    completed = IntegerField(default=0)
+    avg_score = FloatField(null=True)
+    accuracy = FloatField(null=True, help_text="准确率(score>0.6的比例)")
+    status = CharField(max_length=16, default="running")
+    create_time = BigIntegerField(null=True)
+    update_time = BigIntegerField(null=True)
 
     class Meta:
         db_table = "evaluation_run"

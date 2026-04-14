@@ -57,7 +57,7 @@ export const dynamicRoutes: RouteRecordRaw[] = [
   {
     path: "/",
     component: Layouts,
-    redirect: "/file",
+    redirect: "/overview",
     name: "Root",
     meta: {
       roles: ["admin", "team_owner"]
@@ -65,23 +65,23 @@ export const dynamicRoutes: RouteRecordRaw[] = [
     children: []
   },
   {
-    path: "/dashboard",
+    path: "/overview",
     component: Layouts,
-    redirect: "/dashboard/index",
-    name: "Dashboard",
+    redirect: "/overview/index",
+    name: "OverviewLayout",
     meta: {
-      roles: ["admin"]
+      roles: ["admin", "team_owner"]
     },
     children: [
       {
         path: "index",
-        component: () => import("@/pages/user-management/index.vue"),
-        name: "UserManagement",
+        component: () => import("@/pages/overview/index.vue"),
+        name: "Overview",
         meta: {
-          title: "用户管理",
-          svgIcon: "user-management",
-          affix: true,
-          roles: ["admin"]
+          title: "概览",
+          svgIcon: "dashboard",
+          affix: false,
+          roles: ["admin", "team_owner"]
         }
       }
     ]
@@ -100,7 +100,7 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         component: () => import("@/pages/team-management/index.vue"),
         name: "Team",
         meta: {
-          title: "团队管理",
+          title: "组织管理",
           svgIcon: "team-management",
           affix: false,
           keepAlive: true,
@@ -110,47 +110,23 @@ export const dynamicRoutes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: "/config",
+    path: "/dashboard",
     component: Layouts,
-    redirect: "/config/index",
-    name: "ConfigManagement",
+    redirect: "/dashboard/index",
+    name: "Dashboard",
     meta: {
       roles: ["admin"]
     },
     children: [
       {
         path: "index",
-        component: () => import("@/pages/user-config/index.vue"),
-        name: "UserConfig",
+        component: () => import("@/pages/user-management/index.vue"),
+        name: "UserManagement",
         meta: {
-          title: "用户配置",
-          svgIcon: "user-config",
+          title: "用户管理",
+          svgIcon: "user-management",
           affix: false,
-          keepAlive: true,
           roles: ["admin"]
-        }
-      }
-    ]
-  },
-  {
-    path: "/file",
-    component: Layouts,
-    redirect: "/file/index",
-    name: "FileManagement",
-    meta: {
-      roles: ["admin", "team_owner"]
-    },
-    children: [
-      {
-        path: "index",
-        component: () => import("@/pages/file/index.vue"),
-        name: "File",
-        meta: {
-          title: "文件管理",
-          svgIcon: "file",
-          affix: false,
-          keepAlive: true,
-          roles: ["admin", "team_owner"]
         }
       }
     ]
@@ -179,24 +155,24 @@ export const dynamicRoutes: RouteRecordRaw[] = [
     ]
   },
   {
-    path: "/conversation",
+    path: "/file",
     component: Layouts,
-    redirect: "/conversation/index",
-    name: "ConversationManagement",
+    redirect: "/file/index",
+    name: "FileManagement",
     meta: {
-      roles: ["admin"]
+      roles: ["admin", "team_owner"]
     },
     children: [
       {
         path: "index",
-        component: () => import("@/pages/conversation/index.vue"),
-        name: "Conversation",
+        component: () => import("@/pages/file/index.vue"),
+        name: "File",
         meta: {
-          title: "用户会话管理",
-          svgIcon: "conversation",
+          title: "文件管理",
+          svgIcon: "file",
           affix: false,
           keepAlive: true,
-          roles: ["admin"]
+          roles: ["admin", "team_owner"]
         }
       }
     ]
