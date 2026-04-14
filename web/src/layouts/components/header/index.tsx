@@ -3,7 +3,7 @@ import { ReactComponent as WriteIcon } from '@/assets/svg/write.svg';
 import { useTranslate } from '@/hooks/common-hooks';
 import { useFetchAppConf } from '@/hooks/logic-hooks';
 import { useNavigateWithFromState } from '@/hooks/route-hook';
-import { MessageOutlined, SearchOutlined } from '@ant-design/icons';
+import { MessageOutlined, SearchOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { Flex, Layout, Radio, Space, theme } from 'antd';
 import { MouseEventHandler, useCallback, useMemo } from 'react';
 import { useLocation } from 'umi';
@@ -29,6 +29,7 @@ const RagHeader = () => {
       { path: '/knowledge', name: t('knowledgeBase'), icon: KnowledgeBaseIcon },
       { path: '/write', name: t('write'), icon: WriteIcon },
       { path: '/search', name: t('search'), icon: SearchOutlined },
+      { path: '/evaluation', name: t('evaluation'), icon: ExperimentOutlined },
     ],
     [t],
   );
@@ -69,7 +70,7 @@ const RagHeader = () => {
           onClick={handleLogoClick}
           className={styles.logoWrapper}
         >
-          <img src="/logo.svg" alt="" className={styles.appIcon} />
+          <img src="/logo-dtt.png" alt="" className={styles.appIcon} />
           <span className={styles.appName}>{appConf.appName}</span>
         </Space>
       </a>

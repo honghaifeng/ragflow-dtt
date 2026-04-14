@@ -70,6 +70,7 @@ export default {
       fileManager: 'File Management',
       flow: 'Agent',
       search: 'Search',
+      evaluation: 'Evaluation',
     },
     knowledgeList: {
       welcome: 'Welcome back',

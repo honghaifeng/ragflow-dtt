@@ -10,6 +10,7 @@ import MaxTokenNumber from '@/components/max-token-number';
 import PageRank from '@/components/page-rank';
 import ParseConfiguration from '@/components/parse-configuration';
 import GraphRagItems from '@/components/parse-configuration/graph-rag-items';
+import MinerUItems from '@/components/parse-configuration/mineru-items';
 import { Divider } from 'antd';
 import { TagItems } from '../tag-item';
 import { ChunkMethodItem, EmbeddingModelItem } from './common-item';
@@ -36,6 +37,8 @@ export function NaiveConfiguration() {
       <DatasetConfigurationContainer>
         <ParseConfiguration></ParseConfiguration>
       </DatasetConfigurationContainer>
+      <Divider></Divider>
+      <MinerUItems></MinerUItems>
       <Divider></Divider>
       <GraphRagItems></GraphRagItems>
     </section>

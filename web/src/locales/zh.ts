@@ -54,7 +54,7 @@ export default {
       nicknamePlaceholder: '请输入名称',
       register: '创建账户',
       continue: '继续',
-      title: 'Ragflow-Plus',
+      title: 'Ragflow-DTT',
       description:
         '免费注册以探索顶级 RAG 技术。 创建知识库和人工智能来增强您的业务',
       review: '来自 500 多条评论',
@@ -71,6 +71,7 @@ export default {
       flow: 'Agent',
       search: '搜索',
       write: "文档撰写",
+      evaluation: "问答评测",
     },
     knowledgeList: {
       welcome: '欢迎回来',

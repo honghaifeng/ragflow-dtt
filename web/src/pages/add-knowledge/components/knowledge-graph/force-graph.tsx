@@ -14,20 +14,66 @@ const TooltipColorMap = {
 interface IProps {
   data: any;
   show: boolean;
+  filterEntityTypes?: string[];
+  filterCommunities?: string[];
+  highlightCommunity?: string | null;
+  onNodeClick?: (node: any) => void;
+  onEdgeClick?: (edge: any) => void;
 }
 
-const ForceGraph = ({ data, show }: IProps) => {
+const ForceGraph = ({
+  data,
+  show,
+  filterEntityTypes,
+  filterCommunities,
+  highlightCommunity,
+  onNodeClick,
+  onEdgeClick,
+}: IProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<Graph | null>(null);
 
-  const nextData = useMemo(() => {
+  const filteredData = useMemo(() => {
     if (!isEmpty(data)) {
-      const graphData = data;
-      const mi = buildNodesAndCombos(graphData.nodes);
-      return { edges: graphData.edges, ...mi };
+      const graphData = { ...data };
+
+      let nodes = graphData.nodes || [];
+      let edges = graphData.edges || [];
+
+      // Filter by entity type
+      if (filterEntityTypes && filterEntityTypes.length > 0) {
+        nodes = nodes.filter(
+          (n: any) =>
+            !n.entity_type ||
+            filterEntityTypes.includes(
+              (n.entity_type || '').replace(/"/g, ''),
+            ),
+        );
+        const nodeIdSet = new Set(nodes.map((n: any) => n.id));
+        edges = edges.filter(
+          (e: any) => nodeIdSet.has(e.source) && nodeIdSet.has(e.target),
+        );
+      }
+
+      // Filter by community
+      if (filterCommunities && filterCommunities.length > 0) {
+        nodes = nodes.filter((n: any) => {
+          if (!n.communities || !Array.isArray(n.communities)) return true;
+          return n.communities.some((c: string) =>
+            filterCommunities.includes(c),
+          );
+        });
+        const nodeIdSet = new Set(nodes.map((n: any) => n.id));
+        edges = edges.filter(
+          (e: any) => nodeIdSet.has(e.source) && nodeIdSet.has(e.target),
+        );
+      }
+
+      const mi = buildNodesAndCombos(nodes);
+      return { edges, ...mi };
     }
     return { nodes: [], edges: [] };
-  }, [data]);
+  }, [data, filterEntityTypes, filterCommunities]);
 
   const render = useCallback(() => {
     const graph = new Graph({
@@ -41,7 +87,7 @@ const ForceGraph = ({ data, show }: IProps) => {
         'collapse-expand',
         {
           type: 'hover-activate',
-          degree: 1, // 👈🏻 Activate relations.
+          degree: 1,
         },
       ],
       plugins: [
@@ -80,29 +126,45 @@ const ForceGraph = ({ data, show }: IProps) => {
       },
       node: {
         style: {
-          size: 150,
-          labelText: (d) => d.id,
-          // labelPadding: 30,
+          size: (d: any) => {
+            // Size based on pagerank
+            const pagerank = d?.pagerank || 0;
+            const base = 120;
+            return base + pagerank * 200;
+          },
+          labelText: (d: any) => d.id,
           labelFontSize: 40,
-          //   labelOffsetX: 20,
           labelOffsetY: 20,
           labelPlacement: 'center',
           labelWordWrap: true,
+          // Highlight community
+          opacity: (d: any) => {
+            if (!highlightCommunity) return 1;
+            if (
+              d.communities &&
+              Array.isArray(d.communities) &&
+              d.communities.includes(highlightCommunity)
+            ) {
+              return 1;
+            }
+            return 0.15;
+          },
         },
         palette: {
           type: 'group',
-          field: (d) => {
+          field: (d: any) => {
             return d?.entity_type as string;
           },
         },
       },
       edge: {
-        style: (model) => {
+        style: (model: any) => {
           const weight: number = Number(model?.weight) || 2;
           const lineWeight = weight * 4;
           return {
             stroke: '#99ADD1',
             lineWidth: lineWeight > 10 ? 10 : lineWeight,
+            opacity: highlightCommunity ? 0.2 : 1,
           };
         },
       },
@@ -114,16 +176,41 @@ const ForceGraph = ({ data, show }: IProps) => {
 
     graphRef.current = graph;
 
-    graph.setData(nextData);
+    // Node click event
+    graph.on('node:click', (e: any) => {
+      const nodeData = e.target?.config?.data || graph.getNodeData(e.target?.id);
+      if (onNodeClick && nodeData) {
+        onNodeClick(nodeData);
+      }
+    });
 
+    // Edge click event
+    graph.on('edge:click', (e: any) => {
+      const edgeData = e.target?.config?.data || graph.getEdgeData(e.target?.id);
+      if (onEdgeClick && edgeData) {
+        onEdgeClick(edgeData);
+      }
+    });
+
+    graph.setData(filteredData);
     graph.render();
-  }, [nextData]);
+  }, [filteredData, highlightCommunity, onNodeClick, onEdgeClick]);
 
   useEffect(() => {
     if (!isEmpty(data)) {
       render();
     }
   }, [data, render]);
+
+  // Expose graph instance for external use (e.g., export)
+  useEffect(() => {
+    return () => {
+      if (graphRef.current) {
+        graphRef.current.destroy();
+        graphRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div

@@ -127,6 +127,10 @@ const routes = [
         component: '@/pages/file-manager',
       },
       {
+        path: '/evaluation',
+        component: '@/pages/evaluation',
+      },
+      {
         path: '/write',
         component: '@/pages/write',
         layout: false,
