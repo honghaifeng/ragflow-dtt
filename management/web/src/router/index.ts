@@ -78,7 +78,7 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         component: () => import("@/pages/overview/index.vue"),
         name: "Overview",
         meta: {
-          title: "概览",
+          title: "工作台",
           svgIcon: "dashboard",
           affix: false,
           roles: ["admin", "team_owner"]
@@ -100,7 +100,7 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         component: () => import("@/pages/team-management/index.vue"),
         name: "Team",
         meta: {
-          title: "组织管理",
+          title: "组织与权限",
           svgIcon: "team-management",
           affix: false,
           keepAlive: true,
@@ -145,10 +145,32 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         component: () => import("@/pages/knowledgebase/index.vue"),
         name: "KnowledgeBase",
         meta: {
-          title: "知识库管理",
+          title: "知识库",
           svgIcon: "kb",
           affix: false,
           keepAlive: true,
+          roles: ["admin", "team_owner"]
+        }
+      }
+    ]
+  },
+  {
+    path: "/knowledgebase/detail",
+    component: Layouts,
+    name: "KnowledgeBaseDetailLayout",
+    meta: {
+      hidden: true,
+      roles: ["admin", "team_owner"]
+    },
+    children: [
+      {
+        path: ":id",
+        component: () => import("@/pages/knowledgebase/detail.vue"),
+        name: "KnowledgeBaseDetail",
+        meta: {
+          title: "知识库详情",
+          hidden: true,
+          activeMenu: "/knowledgebase/index",
           roles: ["admin", "team_owner"]
         }
       }
@@ -168,10 +190,54 @@ export const dynamicRoutes: RouteRecordRaw[] = [
         component: () => import("@/pages/file/index.vue"),
         name: "File",
         meta: {
-          title: "文件管理",
+          title: "文件池",
           svgIcon: "file",
           affix: false,
           keepAlive: true,
+          roles: ["admin", "team_owner"]
+        }
+      }
+    ]
+  },
+  {
+    path: "/tasks",
+    component: Layouts,
+    redirect: "/tasks/index",
+    name: "TaskCenterLayout",
+    meta: {
+      roles: ["admin", "team_owner"]
+    },
+    children: [
+      {
+        path: "index",
+        component: () => import("@/pages/tasks/index.vue"),
+        name: "TaskCenter",
+        meta: {
+          title: "任务中心",
+          elIcon: "Tickets",
+          affix: false,
+          roles: ["admin", "team_owner"]
+        }
+      }
+    ]
+  },
+  {
+    path: "/conversation",
+    component: Layouts,
+    redirect: "/conversation/index",
+    name: "QualityCenterLayout",
+    meta: {
+      roles: ["admin", "team_owner"]
+    },
+    children: [
+      {
+        path: "index",
+        component: () => import("@/pages/quality/index.vue"),
+        name: "QualityCenter",
+        meta: {
+          title: "对话与评测",
+          svgIcon: "conversation",
+          affix: false,
           roles: ["admin", "team_owner"]
         }
       }

@@ -39,6 +39,8 @@ defineOptions({
   name: "KnowledgeBase"
 })
 
+const router = useRouter()
+
 const loading = ref<boolean>(false)
 const { paginationData, handleCurrentChange, handleSizeChange } = usePagination()
 const createDialogVisible = ref(false)
@@ -457,6 +459,24 @@ function handleView(row: KnowledgeBaseData) {
   batchProgress.value = null
   // 获取文档列表
   getDocumentList()
+}
+
+function handleOpenDetailPage(row: KnowledgeBaseData) {
+  router.push({
+    name: "KnowledgeBaseDetail",
+    params: { id: row.id },
+    query: {
+      name: row.name,
+      description: row.description || "",
+      nickname: row.nickname || "",
+      permission: row.permission || "",
+      language: row.language || "",
+      embd_id: row.embd_id || "",
+      doc_num: String(row.doc_num || 0),
+      chunk_num: String(row.chunk_num || 0),
+      token_num: String(row.token_num || 0)
+    }
+  })
 }
 
 // 格式化解析状态
@@ -1291,7 +1311,13 @@ function loadingEmbeddingModels(){
                 {{ (paginationData.currentPage - 1) * paginationData.pageSize + scope.$index + 1 }}
               </template>
             </el-table-column>
-            <el-table-column prop="name" label="知识库名称" align="center" min-width="120" sortable="custom" />
+            <el-table-column prop="name" label="知识库名称" align="center" min-width="160" sortable="custom">
+              <template #default="scope">
+                <el-link type="primary" @click="handleOpenDetailPage(scope.row)">
+                  {{ scope.row.name }}
+                </el-link>
+              </template>
+            </el-table-column>
             <el-table-column prop="nickname" label="创建人" align="center" min-width="120" sortable="custom" />
             <el-table-column prop="embd_id" label="嵌入模型" align="center" min-width="120" sortable="custom" />
             <el-table-column prop="description" label="描述" align="center" min-width="180" show-overflow-tooltip />

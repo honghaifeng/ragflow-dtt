@@ -664,7 +664,7 @@ function handleDropdownCommand(command: string, row: OrgNode) {
           <el-table-column prop="email" label="邮箱" align="center" />
           <el-table-column label="所属组织" min-width="180" align="center">
             <template #default="{ row }">
-              <el-tag v-for="name in (row.orgNames || [])" :key="name" size="small" style="margin: 2px" :type="name === selectedOrg?.name ? '' : 'info'">{{ name }}</el-tag>
+              <el-tag v-for="name in (row.orgNames || [])" :key="name" size="small" style="margin: 2px" :type="name === selectedOrg?.name ? undefined : 'info'">{{ name }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="角色" width="140" align="center">
