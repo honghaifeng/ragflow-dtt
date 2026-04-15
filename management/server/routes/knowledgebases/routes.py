@@ -242,7 +242,11 @@ def parse_document(doc_id):
         return response
 
     try:
-        result = KnowledgebaseService.parse_document(doc_id)
+        parser_config = None
+        if request.is_json and request.json:
+            parser_config = request.json.get("parser_config")
+
+        result = KnowledgebaseService.parse_document(doc_id, parser_config=parser_config)
         if result.get("success"):
             return success_response(data={"message": f"文档 {doc_id} 同步解析完成。", "details": result})
         else:

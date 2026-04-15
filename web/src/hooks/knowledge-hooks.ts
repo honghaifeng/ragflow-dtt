@@ -408,7 +408,7 @@ export function useFetchKnowledgeGraph() {
 
   const { data, isFetching: loading } = useQuery<IKnowledgeGraph>({
     queryKey: ['fetchKnowledgeGraph', knowledgeBaseId],
-    initialData: { graph: {}, mind_map: {} } as IKnowledgeGraph,
+    initialData: { graph: {}, mind_map: {}, community_reports: [] } as IKnowledgeGraph,
     enabled: !!knowledgeBaseId,
     gcTime: 0,
     queryFn: async () => {

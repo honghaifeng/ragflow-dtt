@@ -45,10 +45,11 @@ export function getDocumentParseProgress(docId: any) {
 }
 
 // 开始解析文档
-export function startDocumentParse(docId: any) {
+export function startDocumentParse(docId: any, parserConfig?: any) {
   return request({
     url: `/api/v1/knowledgebases/documents/${docId}/parse`,
-    method: "post"
+    method: "post",
+    data: parserConfig ? { parser_config: parserConfig } : undefined
   })
 }
 

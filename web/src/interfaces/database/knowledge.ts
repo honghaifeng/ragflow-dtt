@@ -138,7 +138,16 @@ export interface ITestingResult {
 
 export type IRenameTag = { fromTag: string; toTag: string };
 
+export interface ICommunityReport {
+  title: string;
+  entities: string[];
+  weight: number;
+  report: string;
+  evidences: string;
+}
+
 export interface IKnowledgeGraph {
   graph: Record<string, any>;
   mind_map: TreeData;
+  community_reports?: ICommunityReport[];
 }

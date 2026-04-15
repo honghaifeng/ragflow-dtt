@@ -104,7 +104,7 @@ def capture_stdout_stderr(doc_id):
         sys.stderr = old_stderr
 
 
-def perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info):
+def perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info, parser_config=None):
     """
     执行文档解析的核心逻辑
 
@@ -113,10 +113,22 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info):
         doc_info (dict): 包含文档信息的字典 (name, location, type, kb_id, parser_config, created_by).
         file_info (dict): 包含文件信息的字典 (parent_id/bucket_name).
         kb_info (dict): 包含知识库信息的字典 (created_by).
+        parser_config (dict, optional): 解析配置参数.
+            - ocr_mode: "auto" / "force_ocr" / "force_text"
+            - extract_images: bool
+            - chunk_strategy: "paragraph" / "page" / "custom"
+            - chunk_max_length: int
 
     Returns:
         dict: 包含解析结果的字典 (success, chunk_count).
     """
+    if parser_config is None:
+        parser_config = {}
+
+    ocr_mode = parser_config.get("ocr_mode", "auto")
+    extract_images = parser_config.get("extract_images", True)
+    chunk_strategy = parser_config.get("chunk_strategy", "paragraph")
+    chunk_max_length = parser_config.get("chunk_max_length", 0)
     temp_pdf_path = None
     temp_image_dir = None
     start_time = time.time()
@@ -210,7 +222,12 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info):
                 ds = PymuDocDataset(pdf_bytes)
 
                 update_progress(0.3, "分析PDF类型")
-                is_ocr = ds.classify() == SupportedPdfParseMethod.OCR
+                if ocr_mode == "force_ocr":
+                    is_ocr = True
+                elif ocr_mode == "force_text":
+                    is_ocr = False
+                else:
+                    is_ocr = ds.classify() == SupportedPdfParseMethod.OCR
                 mode_msg = "OCR模式" if is_ocr else "文本模式"
                 update_progress(0.4, f"使用{mode_msg}处理PDF，正在进行详细解析...")
 
@@ -338,6 +355,46 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info):
             except Exception as e:
                 logger.error(f"[Parser-ERROR] 处理 middle_json_content 时出错: {e}")
                 raise Exception(f"[Parser-ERROR] 处理 middle_json_content 时出错: {e}")
+
+        # 2.5 根据分块策略合并内容
+        if chunk_strategy == "custom" and chunk_max_length > 0:
+            merged_list = []
+            buffer_text = ""
+            buffer_type = "text"
+            for item in content_list:
+                if item["type"] in ("text", "table", "equation"):
+                    text = item.get("text", "") or item.get("table_body", "")
+                    if len(buffer_text) + len(text) > chunk_max_length and buffer_text:
+                        merged_list.append({"type": buffer_type, "text": buffer_text})
+                        buffer_text = text
+                    else:
+                        buffer_text += ("\n" if buffer_text else "") + text
+                else:
+                    if buffer_text:
+                        merged_list.append({"type": buffer_type, "text": buffer_text})
+                        buffer_text = ""
+                    merged_list.append(item)
+            if buffer_text:
+                merged_list.append({"type": buffer_type, "text": buffer_text})
+            content_list = merged_list
+            logger.info(f"[Parser-INFO] 自定义分块: max_length={chunk_max_length}, 合并后 {len(content_list)} 块")
+        elif chunk_strategy == "page" and middle_json_content:
+            # 按页面合并：将同一页面的内容合并为一个块
+            page_texts = {}
+            non_text_items = []
+            for item in content_list:
+                if item["type"] in ("text", "table", "equation"):
+                    text = item.get("text", "") or item.get("table_body", "")
+                    # 简单按顺序分配页面
+                    page_idx = len(page_texts)
+                    if page_idx not in page_texts:
+                        page_texts[page_idx] = ""
+                    page_texts[page_idx] += ("\n" if page_texts[page_idx] else "") + text
+                else:
+                    non_text_items.append(item)
+            page_list = [{"type": "text", "text": t} for t in page_texts.values() if t.strip()]
+            content_list = page_list + non_text_items
+            logger.info(f"[Parser-INFO] 按页面分块: {len(page_list)} 页文本块")
 
         # 3. 处理解析结果 (上传到MinIO, 存储到ES)
         update_progress(0.95, "保存解析结果")
@@ -572,6 +629,8 @@ def perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info):
                     raise Exception(f"[Parser-ERROR] 处理文本块 {chunk_idx} (page: {page_idx}, bbox: {bbox}) 失败: {e}")
 
             elif chunk_data["type"] == "image":
+                if not extract_images:
+                    continue
                 img_path_relative = chunk_data.get("img_path")
                 if not img_path_relative or not temp_image_dir:
                     continue

@@ -238,7 +238,7 @@ def knowledge_graph(kb_id):
     _, kb = KnowledgebaseService.get_by_id(kb_id)
     req = {"kb_id": [kb_id], "knowledge_graph_kwd": ["graph"]}
 
-    obj = {"graph": {}, "mind_map": {}}
+    obj = {"graph": {}, "mind_map": {}, "community_reports": []}
     if not settings.docStoreConn.indexExist(search.index_name(kb.tenant_id), kb_id):
         return get_json_result(data=obj)
     sres = settings.retrievaler.search(req, search.index_name(kb.tenant_id), [kb_id])
@@ -260,6 +260,29 @@ def knowledge_graph(kb_id):
             node_id_set = {o["id"] for o in obj["graph"]["nodes"]}
             filtered_edges = [o for o in obj["graph"]["edges"] if o["source"] != o["target"] and o["source"] in node_id_set and o["target"] in node_id_set]
             obj["graph"]["edges"] = sorted(filtered_edges, key=lambda x: x.get("weight", 0), reverse=True)[:128]
+
+    # Fetch community reports
+    try:
+        cr_req = {"kb_id": [kb_id], "knowledge_graph_kwd": ["community_report"]}
+        cr_sres = settings.retrievaler.search(cr_req, search.index_name(kb.tenant_id), [kb_id])
+        if cr_sres and len(cr_sres.ids):
+            reports = []
+            for cid in cr_sres.ids[:50]:
+                try:
+                    content = json.loads(cr_sres.field[cid].get("content_with_weight", "{}"))
+                    reports.append({
+                        "title": cr_sres.field[cid].get("docnm_kwd", ""),
+                        "entities": cr_sres.field[cid].get("entities_kwd", []),
+                        "weight": cr_sres.field[cid].get("weight_flt", 0),
+                        "report": content.get("report", ""),
+                        "evidences": content.get("evidences", ""),
+                    })
+                except Exception:
+                    continue
+            obj["community_reports"] = sorted(reports, key=lambda x: x.get("weight", 0), reverse=True)
+    except Exception:
+        pass
+
     return get_json_result(data=obj)
 
 

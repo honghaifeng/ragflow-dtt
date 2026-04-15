@@ -16,7 +16,8 @@ import {
 import { createKnowledgeBaseApi } from "@@/apis/kbs/knowledgebase"
 import { uploadFileApiV2 } from "@@/apis/files/upload"
 import { addDocumentToKnowledgeBaseApi } from "@@/apis/kbs/knowledgebase"
-import { CirclePlus, Delete, Refresh, Search, ArrowLeft, Edit, MoreFilled, Upload } from "@element-plus/icons-vue"
+import { startDocumentParse, getDocumentParseProgress } from "@@/apis/kbs/document"
+import { CirclePlus, Delete, Refresh, Search, ArrowLeft, Edit, MoreFilled, Upload, Setting, VideoPlay } from "@element-plus/icons-vue"
 
 defineOptions({
   name: "TeamManagement"
@@ -483,6 +484,95 @@ function handleDelete(row: OrgNode) {
   })
 }
 
+// ==================== 解析配置 ====================
+const parseConfigDialogVisible = ref(false)
+const parseLoading = ref(false)
+const currentParseFile = ref<FileItem | null>(null)
+const parseConfig = reactive({
+  ocr_mode: "auto" as "auto" | "force_ocr" | "force_text",
+  extract_images: true,
+  chunk_strategy: "paragraph" as "paragraph" | "page" | "custom",
+  chunk_max_length: 500
+})
+
+function handleParseConfig(file: FileItem) {
+  currentParseFile.value = file
+  parseConfig.ocr_mode = "auto"
+  parseConfig.extract_images = true
+  parseConfig.chunk_strategy = "paragraph"
+  parseConfig.chunk_max_length = 500
+  parseConfigDialogVisible.value = true
+}
+
+function handleQuickParse(file: FileItem) {
+  parseLoading.value = true
+  startDocumentParse(file.id)
+    .then(() => {
+      ElMessage.success("解析已开始")
+      if (selectedOrg.value) fetchFiles(selectedOrg.value.id)
+    })
+    .catch(() => { ElMessage.error("解析失败") })
+    .finally(() => { parseLoading.value = false })
+}
+
+function confirmParse() {
+  if (!currentParseFile.value) return
+  parseLoading.value = true
+  const config = { ...parseConfig }
+  if (config.chunk_strategy !== "custom") {
+    delete (config as any).chunk_max_length
+  }
+  startDocumentParse(currentParseFile.value.id, config)
+    .then(() => {
+      ElMessage.success("解析已开始")
+      parseConfigDialogVisible.value = false
+      if (selectedOrg.value) fetchFiles(selectedOrg.value.id)
+    })
+    .catch(() => { ElMessage.error("解析失败") })
+    .finally(() => { parseLoading.value = false })
+}
+
+// ==================== 解析日志 ====================
+const parseLogDialogVisible = ref(false)
+const parseLogFile = ref<FileItem | null>(null)
+const parseLogMessage = ref("")
+const parseLogProgress = ref(0)
+const parseLogTimer = ref<any>(null)
+
+function handleViewParseLog(file: FileItem) {
+  parseLogFile.value = file
+  parseLogMessage.value = ""
+  parseLogProgress.value = file.progress || 0
+  parseLogDialogVisible.value = true
+  pollParseLog(file.id)
+}
+
+function pollParseLog(docId: string) {
+  if (parseLogTimer.value) clearInterval(parseLogTimer.value)
+  const fetchLog = () => {
+    getDocumentParseProgress(docId)
+      .then((res: any) => {
+        const data = res.data || {}
+        parseLogMessage.value = data.message || ""
+        parseLogProgress.value = data.progress || 0
+        if (data.progress >= 1 || data.run === "0" || data.run === "3") {
+          clearInterval(parseLogTimer.value)
+          parseLogTimer.value = null
+        }
+      })
+      .catch(() => {})
+  }
+  fetchLog()
+  parseLogTimer.value = setInterval(fetchLog, 2000)
+}
+
+watch(parseLogDialogVisible, (val) => {
+  if (!val && parseLogTimer.value) {
+    clearInterval(parseLogTimer.value)
+    parseLogTimer.value = null
+  }
+})
+
 function handleDropdownCommand(command: string, row: OrgNode) {
   if (command === "members") openDetail(row, "members")
   else if (command === "kbs") openDetail(row, "kbs")
@@ -660,6 +750,13 @@ function handleDropdownCommand(command: string, row: OrgNode) {
               </template>
             </el-table-column>
             <el-table-column prop="createTime" label="创建时间" width="170" align="center" />
+            <el-table-column fixed="right" label="操作" width="220" align="center">
+              <template #default="{ row }">
+                <el-button type="primary" text bg size="small" :icon="VideoPlay" :disabled="row.progress > 0 && row.progress < 1" @click="handleQuickParse(row)">解析</el-button>
+                <el-button type="warning" text bg size="small" :icon="Setting" @click="handleParseConfig(row)">配置</el-button>
+                <el-button v-if="row.progress > 0" type="info" text bg size="small" @click="handleViewParseLog(row)">日志</el-button>
+              </template>
+            </el-table-column>
           </el-table>
           <el-empty v-else description="暂无文件" />
         </div>
@@ -760,6 +857,52 @@ function handleDropdownCommand(command: string, row: OrgNode) {
         <el-button type="primary" :loading="uploadLoading" @click="confirmUploadFile">上传</el-button>
       </template>
     </el-dialog>
+
+    <!-- 解析配置弹窗 -->
+    <el-dialog v-model="parseConfigDialogVisible" title="解析配置" width="480px" destroy-on-close>
+      <div v-if="currentParseFile" style="margin-bottom: 16px; color: var(--el-text-color-secondary); font-size: 13px;">
+        文件: {{ currentParseFile.name }}
+      </div>
+      <el-form label-width="100px">
+        <el-form-item label="OCR模式">
+          <el-radio-group v-model="parseConfig.ocr_mode">
+            <el-radio value="auto">自动检测</el-radio>
+            <el-radio value="force_ocr">强制OCR</el-radio>
+            <el-radio value="force_text">强制文本</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="提取图片">
+          <el-switch v-model="parseConfig.extract_images" />
+        </el-form-item>
+        <el-form-item label="分块策略">
+          <el-radio-group v-model="parseConfig.chunk_strategy">
+            <el-radio value="paragraph">按段落</el-radio>
+            <el-radio value="page">按页面</el-radio>
+            <el-radio value="custom">自定义长度</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="parseConfig.chunk_strategy === 'custom'" label="最大长度">
+          <el-input-number v-model="parseConfig.chunk_max_length" :min="100" :max="10000" :step="100" />
+          <span style="margin-left: 8px; color: var(--el-text-color-secondary); font-size: 12px;">字符</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="parseConfigDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="parseLoading" @click="confirmParse">开始解析</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 解析日志弹窗 -->
+    <el-dialog v-model="parseLogDialogVisible" title="解析日志" width="560px" destroy-on-close>
+      <div v-if="parseLogFile" style="margin-bottom: 12px; font-size: 13px; color: var(--el-text-color-secondary);">
+        文件: {{ parseLogFile.name }}
+      </div>
+      <el-progress :percentage="Math.round(parseLogProgress * 100)" :stroke-width="10" style="margin-bottom: 16px;" />
+      <div class="parse-log-box">
+        <div v-if="parseLogMessage" class="parse-log-content">{{ parseLogMessage }}</div>
+        <div v-else style="color: var(--el-text-color-placeholder); text-align: center; padding: 20px;">暂无日志信息</div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -848,5 +991,22 @@ function handleDropdownCommand(command: string, row: OrgNode) {
     font-size: 11px;
     color: var(--el-text-color-placeholder);
   }
+}
+
+// 解析日志
+.parse-log-box {
+  background: #f5f7fa;
+  border-radius: 6px;
+  padding: 16px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: "Courier New", monospace;
+}
+.parse-log-content {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 </style>

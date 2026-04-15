@@ -832,7 +832,7 @@ class KnowledgebaseService:
             raise Exception(f"删除文档失败: {str(e)}")
 
     @classmethod
-    def parse_document(cls, doc_id):
+    def parse_document(cls, doc_id, parser_config=None):
         """解析文档"""
         conn = None
         cursor = None
@@ -888,7 +888,7 @@ class KnowledgebaseService:
 
             # 调用后台解析函数
             embedding_config = cls.get_kb_embedding_config(kb_id["kb_id"])
-            parse_result = perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info)
+            parse_result = perform_parse(doc_id, doc_info, file_info, embedding_config, kb_info, parser_config=parser_config)
 
             # 返回解析结果
             return parse_result
